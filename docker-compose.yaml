@@ -1,0 +1,96 @@
+version: '3.8'
+
+services:
+  mysql:
+    image: mysql:8.0
+    container_name: mysql
+    environment:
+      MYSQL_ROOT_PASSWORD: root
+      MYSQL_DATABASE: productdb
+    ports:
+      - "3306:3306"
+    volumes:
+      - mysql_data:/var/lib/mysql
+      - ../Product/init-db.sql:/docker-entrypoint-initdb.d/01-product-init.sql
+      - ../Order/init-db.sql:/docker-entrypoint-initdb.d/02-order-init.sql
+    command: --default-authentication-plugin=mysql_native_password
+    restart: unless-stopped
+
+  redis:
+    image: redis:7.0-alpine
+    container_name: redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    restart: unless-stopped
+
+  product-service:
+    build:
+      context: ../Product
+      dockerfile: Dockerfile
+    container_name: product-service
+    environment:
+      DB_HOST: mysql
+      DB_USER: root
+      DB_PASSWORD: root
+      DB_NAME: productdb
+      PORT: 3003
+    ports:
+      - "3003:3003"
+    depends_on:
+      - mysql
+    restart: unless-stopped
+
+  order-service:
+    build:
+      context: ../Order
+      dockerfile: Dockerfile
+    container_name: order-service
+    environment:
+      DB_HOST: mysql
+      DB_USER: root
+      DB_PASSWORD: root
+      DB_NAME: orderdb
+      PORT: 3001
+    ports:
+      - "3001:3001"
+    depends_on:
+      - mysql
+    restart: unless-stopped
+
+  cart-service:
+    build:
+      context: ../Cart
+      dockerfile: Dockerfile
+    container_name: cart-service
+    environment:
+      REDIS_URL: redis://redis:6379
+      PORT: 3002
+    ports:
+      - "3002:3002"
+    depends_on:
+      - redis
+    restart: unless-stopped
+
+  frontend:
+    build:
+      context: ../Frontend
+      dockerfile: Dockerfile
+    container_name: frontend
+    environment:
+      NEXT_PUBLIC_PRODUCT_SERVICE_URL: http://localhost:3003
+      NEXT_PUBLIC_ORDER_SERVICE_URL: http://localhost:3001
+      NEXT_PUBLIC_CART_SERVICE_URL: http://localhost:3002
+      PORT: 3000
+    ports:
+      - "3000:3000"
+    depends_on:
+      - product-service
+      - order-service
+      - cart-service
+    restart: unless-stopped
+
+volumes:
+  mysql_data:
+  redis_data:
