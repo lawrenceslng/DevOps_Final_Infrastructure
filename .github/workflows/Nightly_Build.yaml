@@ -57,20 +57,16 @@ jobs:
         id: set_outputs
         run: |
           chmod +x ./Infra/scripts/check-shas.sh
-          ./Infra/scripts/check-shas.sh > result.env
+          ./Infra/scripts/check-shas.sh
           cat result.env >> $GITHUB_OUTPUT
-
-      - name: Save Commit SHAs
-        if: |
-          needs.check-for-changes.outputs.cart_changed == 'true' ||
-          needs.check-for-changes.outputs.product_changed == 'true' ||
-          needs.check-for-changes.outputs.order_changed == 'true' ||
-          needs.check-for-changes.outputs.frontend_changed == 'true'
+  
+      - name: Upload New SHAs
+        if: steps.set_outputs.outputs.cart_changed == 'true' || steps.set_outputs.outputs.product_changed == 'true' || steps.set_outputs.outputs.order_changed == 'true' || steps.set_outputs.outputs.frontend_changed == 'true'
         uses: actions/upload-artifact@v4
         with:
           name: last-nightly-shas
           path: new-shas/
-  
+
   build-cart:
     name: Build & Push Cart Image
     needs: check-for-changes
@@ -197,5 +193,5 @@ jobs:
           IMAGE_TAG=nightly-$(date +%Y%m%d)
           IMAGE_URI=${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ secrets.AWS_ACCOUNT_REGION }}.amazonaws.com/frontend:$IMAGE_TAG
 
-          docker build -t $IMAGE_URI .
+          docker build -t $IMAGE_URI ./Frontend
           docker push $IMAGE_URI

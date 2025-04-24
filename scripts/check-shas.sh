@@ -14,11 +14,11 @@ LAST_PRODUCT_SHA=$(cat old-shas/product.sha 2>/dev/null || echo "")
 LAST_ORDER_SHA=$(cat old-shas/order.sha 2>/dev/null || echo "")
 LAST_FRONTEND_SHA=$(cat old-shas/frontend.sha 2>/dev/null || echo "")
 
-# Compare and output results
-[ "$CART_SHA" != "$LAST_CART_SHA" ] && echo "cart_changed=true" || echo "cart_changed=false"
-[ "$PRODUCT_SHA" != "$LAST_PRODUCT_SHA" ] && echo "product_changed=true" || echo "product_changed=false"
-[ "$ORDER_SHA" != "$LAST_ORDER_SHA" ] && echo "order_changed=true" || echo "order_changed=false"
-[ "$FRONTEND_SHA" != "$LAST_FRONTEND_SHA" ] && echo "frontend_changed=true" || echo "frontend_changed=false"
+# Prepare result.env file
+echo "cart_changed=$([[ \"$CART_SHA\" != \"$LAST_CART_SHA\" ]] && echo true || echo false)" > result.env
+echo "product_changed=$([[ \"$PRODUCT_SHA\" != \"$LAST_PRODUCT_SHA\" ]] && echo true || echo false)" >> result.env
+echo "order_changed=$([[ \"$ORDER_SHA\" != \"$LAST_ORDER_SHA\" ]] && echo true || echo false)" >> result.env
+echo "frontend_changed=$([[ \"$FRONTEND_SHA\" != \"$LAST_FRONTEND_SHA\" ]] && echo true || echo false)" >> result.env
 
 # Also save current SHAs to be reused later
 mkdir -p new-shas
