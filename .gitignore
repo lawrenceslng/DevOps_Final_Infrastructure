@@ -3,3 +3,6 @@ labsuser.pem
 .terraform.lock.hcl
 *.tfstate
 *.tfstate.*
+.env_var
+tf-outputs.json
+eks-args.env

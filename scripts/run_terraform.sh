@@ -2,10 +2,10 @@
 
 echo $(pwd)
 
-# cd ../terraform
+cd ../terraform
 
 # terraform init
 # terraform fmt
-# terraform validate
-# terraform apply
-# terraform output -json > tf-outputs.json
+terraform validate
+terraform apply
+terraform output -json > tf-outputs.json
