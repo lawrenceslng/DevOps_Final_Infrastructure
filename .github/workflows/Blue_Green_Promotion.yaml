@@ -1,0 +1,54 @@
+name: Promote Green Deployment to Live
+
+on:
+  schedule:
+    - cron: '0 * * * *'  # every hour (or adjust as needed)
+  workflow_dispatch:
+
+jobs:
+  promote:
+    runs-on: ubuntu-latest
+    env:
+      NAMESPACE: prod
+
+    steps:
+      - name: Checkout Infra Repo
+        uses: actions/checkout@v4
+
+      - name: Set up kubectl
+        uses: azure/setup-kubectl@v3
+        with:
+          version: '1.27.0'
+
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-region: ${{ secrets.AWS_ACCOUNT_REGION }}
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-session-token: ${{ secrets.AWS_SESSION_TOKEN }}
+
+      - name: Update kubeconfig
+        run: aws eks update-kubeconfig --name devops-final-cluster --region us-east-1
+
+      - name: Check each repo for 'live' tag and promote green
+        run: |
+          declare -A repos=(
+            ["frontend"]="lawrenceslng/DevOps_Final_Frontend"
+            ["cart-service"]="lawrenceslng/DevOps_Final_Cart_Service"
+            ["order-service"]="lawrenceslng/DevOps_Final_Order_Service"
+            ["product-service"]="lawrenceslng/DevOps_Final_Product_Service"
+          )
+
+          for service in "${!repos[@]}"; do
+            repo="${repos[$service]}"
+            latest_tag=$(curl -s https://api.github.com/repos/$repo/git/refs/tags | jq -r '.[].ref' | grep 'live' | tail -n 1)
+
+            if [[ $latest_tag == *"live"* ]]; then
+              echo "🔁 Found 'live' tag for $service — promoting green version."
+              kubectl -n $NAMESPACE patch service $service \
+                -p "{\"spec\": {\"selector\": {\"app\": \"$service\", \"version\": \"green\"}}}"
+            else
+              echo "✅ No 'live' tag found for $service — skipping."
+            fi
+          done

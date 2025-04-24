@@ -1,0 +1,210 @@
+name: Nightly Build
+
+on:
+  # Configuring this to not run every night and consume minutes
+  # schedule:
+    # - cron: "0 8 * * *"  # Runs every day at 12 AM Pacific time
+  workflow_dispatch:  # Allows manual trigger
+
+jobs:
+  check-for-changes:
+    name: Checking for Changes in Microservices
+    runs-on: ubuntu-latest
+    outputs:
+      cart_changed: ${{ steps.set_outputs.outputs.cart_changed }}
+      product_changed: ${{ steps.set_outputs.outputs.product_changed }}
+      order_changed: ${{ steps.set_outputs.outputs.order_changed }}
+      frontend_changed: ${{ steps.set_outputs.outputs.frontend_changed }}
+
+    steps:
+      - name: Download last SHAs (if exists)
+        uses: actions/download-artifact@v4
+        with:
+          name: last-nightly-shas
+          path: old-shas
+        continue-on-error: true
+
+      - name: Checkout Infrastructure Repository
+        uses: actions/checkout@v4
+        with:
+          path: Infra
+
+      - name: Checkout Cart Service Repository
+        uses: actions/checkout@v4
+        with:
+          repository: lawrenceslng/DevOps_Final_Cart_Service
+          path: Cart
+
+      - name: Checkout Product Service Repository
+        uses: actions/checkout@v4
+        with:
+          repository: lawrenceslng/DevOps_Final_Product_Service
+          path: Product
+
+      - name: Checkout Order Service Repository
+        uses: actions/checkout@v4
+        with:
+          repository: lawrenceslng/DevOps_Final_Order_Service
+          path: Order
+
+      - name: Checkout Frontend Repository
+        uses: actions/checkout@v4
+        with:
+          repository: lawrenceslng/DevOps_Final_Frontend
+          path: Frontend
+
+      - name: Compare SHAs
+        id: set_outputs
+        run: |
+          chmod +x ./Infra/scripts/check-shas.sh
+          ./Infra/scripts/check-shas.sh > result.env
+          cat result.env >> $GITHUB_OUTPUT
+  
+  build-cart:
+    name: Build & Push Cart Image
+    needs: check-for-changes
+    if: needs.check-for-changes.outputs.cart_changed == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Cart Repo
+        uses: actions/checkout@v4
+        with:
+          repository: lawrenceslng/DevOps_Final_Cart_Service
+          path: Cart
+
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-region: ${{ secrets.AWS_ACCOUNT_REGION }}
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-session-token: ${{ secrets.AWS_SESSION_TOKEN }}
+
+      - name: Login to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Build and Push Docker Image
+        run: |
+          IMAGE_TAG=nightly-$(date +%Y%m%d)
+          IMAGE_URI=${{ steps.login-ecr.outputs.registry }}/cart-service:$IMAGE_TAG
+
+          docker build -t $IMAGE_URI ./Cart
+          docker push $IMAGE_URI
+
+  build-product:
+    name: Build & Push Product Image
+    needs: check-for-changes
+    if: needs.check-for-changes.outputs.product_changed == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Product Repo
+        uses: actions/checkout@v4
+        with:
+          repository: lawrenceslng/DevOps_Final_Product_Service
+          path: Product
+
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-region: ${{ secrets.AWS_ACCOUNT_REGION }}
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-session-token: ${{ secrets.AWS_SESSION_TOKEN }}
+
+      - name: Login to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Build and Push Docker Image
+        run: |
+          IMAGE_TAG=nightly-$(date +%Y%m%d)
+          IMAGE_URI=${{ steps.login-ecr.outputs.registry }}/product-service:$IMAGE_TAG
+
+          docker build -t $IMAGE_URI ./Product
+          docker push $IMAGE_URI
+
+  build-order:
+    name: Build & Push Order Image
+    needs: check-for-changes
+    if: needs.check-for-changes.outputs.order_changed == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Order Repo
+        uses: actions/checkout@v4
+        with:
+          repository: lawrenceslng/DevOps_Final_Order_Service
+          path: Order
+
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-region: ${{ secrets.AWS_ACCOUNT_REGION }}
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-session-token: ${{ secrets.AWS_SESSION_TOKEN }}
+
+      - name: Login to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Build and Push Docker Image
+        run: |
+          IMAGE_TAG=nightly-$(date +%Y%m%d)
+          IMAGE_URI=${{ steps.login-ecr.outputs.registry }}/order-service:$IMAGE_TAG
+
+          docker build -t $IMAGE_URI ./Order
+          docker push $IMAGE_URI
+
+  build-frontend:
+    name: Build & Push Frontend Image
+    needs: check-for-changes
+    if: needs.check-for-changes.outputs.frontend_changed == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Frontend Repo
+        uses: actions/checkout@v4
+        with:
+          repository: lawrenceslng/DevOps_Final_Frontend
+          path: Frontend
+
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-region: ${{ secrets.AWS_ACCOUNT_REGION }}
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-session-token: ${{ secrets.AWS_SESSION_TOKEN }}
+
+      - name: Login to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Build and Push Docker Image
+        run: |
+          IMAGE_TAG=nightly-$(date +%Y%m%d)
+          IMAGE_URI=${{ steps.login-ecr.outputs.registry }}/frontend:$IMAGE_TAG
+
+          docker build -t $IMAGE_URI ./Frontend
+          docker push $IMAGE_URI
+
+  save-commit-shas:
+    name: Save Commit SHAs
+    needs:
+      - check-for-changes
+      - build-cart
+      - build-product
+      - build-order
+      - build-frontend
+    if: |
+      needs.check-for-changes.outputs.cart_changed == 'true' ||
+      needs.check-for-changes.outputs.product_changed == 'true' ||
+      needs.check-for-changes.outputs.order_changed == 'true' ||
+      needs.check-for-changes.outputs.frontend_changed == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Upload New SHAs
+        uses: actions/upload-artifact@v4
+        with:
+          name: last-nightly-shas
+          path: new-shas/

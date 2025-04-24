@@ -1,0 +1,35 @@
+name: Destroy UAT
+
+on:
+  workflow_dispatch:
+
+jobs:
+  cleanup-uat:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Infrastructure Repository
+        uses: actions/checkout@v4
+        with:
+          path: Infra
+
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-region: ${{ secrets.AWS_ACCOUNT_REGION }}
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-session-token: ${{ secrets.AWS_SESSION_TOKEN }}
+
+      - name: Set up kubectl
+        uses: azure/setup-kubectl@v3
+        with:
+          version: '1.27.0'
+
+      - name: Update kubeconfig
+        run: aws eks update-kubeconfig --region us-east-1 --name devops-final-cluster
+
+      - name: Run Cleanup Job
+        run: |
+          kubectl apply -f Infra/k8s/uat/cleanup.yaml -n uat
+          echo "✅ Cleanup job triggered. It will auto-delete all UAT resources."
