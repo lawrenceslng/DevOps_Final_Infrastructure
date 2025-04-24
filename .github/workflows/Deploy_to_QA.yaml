@@ -16,6 +16,7 @@ jobs:
           aws-session-token: ${{ secrets.AWS_SESSION_TOKEN }}
 
       - name: Create QA EC2
+        id: launch
         run: |
           INSTANCE_ID=$(aws ec2 run-instances \
             --image-id ${{ secrets.AWS_QA_AMI }} \
