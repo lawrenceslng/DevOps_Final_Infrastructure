@@ -42,6 +42,7 @@ jobs:
             --subnet-id ${{ secrets.AWS_PUBLIC_SUBNET_ID }} \
             --security-group-ids ${{ secrets.AWS_QA_SECURITY_GROUP_ID }} \
             --key-name ${{ secrets.AWS_EC2_KEY_PAIR_NAME }} \
+            --associate-public-ip-address \
             --tag-specifications 'ResourceType=instance,Tags=[{Key=Name,Value=bastion-host}]' \
             --query 'Instances[0].InstanceId' --output text)
 
