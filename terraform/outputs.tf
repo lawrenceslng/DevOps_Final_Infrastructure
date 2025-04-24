@@ -47,3 +47,13 @@ output "all_worker_mgmt_sg_id" {
   description = "The ID of the all_worker_mgmt security group"
   value       = aws_security_group.all_worker_mgmt.id
 }
+
+output "qa_sg_id" {
+  description = "The ID of the qa_ec2_group security group"
+  value       = aws_security_group.qa_ec2_group.id
+}
+
+output "hosted_zone_id" {
+  description = "The ID of the Route 53 hosted zone"
+  value       = aws_route53_zone.main.zone_id
+}

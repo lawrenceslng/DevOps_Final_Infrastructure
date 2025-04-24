@@ -1,0 +1,130 @@
+name: Deploy to QA
+
+on:
+  workflow_dispatch:
+
+jobs:
+  create-qa-and-update-dns:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-region: ${{ secrets.AWS_ACCOUNT_REGION }}
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-session-token: ${{ secrets.AWS_SESSION_TOKEN }}
+
+      - name: Create QA EC2
+        run: |
+          INSTANCE_ID=$(aws ec2 run-instances \
+            --image-id ${{ secrets.AWS_QA_AMI }} \
+            --instance-type t2.micro \
+            --subnet-id ${{ secrets.AWS_PRIVATE_SUBNET_ID }} \
+            --key-name ${{ secrets.AWS_EC2_KEY_PAIR_NAME }} \
+            --security-group-ids ${{ secrets.AWS_QA_SECURITY_GROUP_ID }} \
+            --tag-specifications 'ResourceType=instance,Tags=[{Key=Name,Value=qa-ec2}]' \
+            --query 'Instances[0].InstanceId' --output text)
+          
+          echo "instance_id=$INSTANCE_ID" >> $GITHUB_OUTPUT
+
+      - name: Wait for EC2 to be running
+        run: |
+          aws ec2 wait instance-running --instance-ids ${{ steps.launch.outputs.instance_id }}
+          echo "✅ QA EC2 is running"
+
+      - name: Launch Bastion Host (Public Subnet)
+        id: bastion
+        run: |
+          BASTION_ID=$(aws ec2 run-instances \
+            --image-id ${{ secrets.AWS_QA_AMI }} \
+            --instance-type t2.micro \
+            --subnet-id ${{ secrets.AWS_PUBLIC_SUBNET_ID }} \
+            --security-group-ids ${{ secrets.AWS_QA_SECURITY_GROUP_ID }} \
+            --key-name ${{ secrets.AWS_EC2_KEY_PAIR_NAME }} \
+            --tag-specifications 'ResourceType=instance,Tags=[{Key=Name,Value=bastion-host}]' \
+            --query 'Instances[0].InstanceId' --output text)
+
+          echo "bastion_id=$BASTION_ID" >> $GITHUB_OUTPUT
+
+      - name: Get Bastion Public IP
+        id: bastion-ip
+        run: |
+          aws ec2 wait instance-running --instance-ids ${{ steps.bastion.outputs.bastion_id }}
+          PUBLIC_IP=$(aws ec2 describe-instances \
+            --instance-ids ${{ steps.bastion.outputs.bastion_id }} \
+            --query "Reservations[0].Instances[0].PublicIpAddress" --output text)
+
+          echo "bastion_ip=$PUBLIC_IP" >> $GITHUB_OUTPUT
+
+      - name: Get EC2 Private IP
+        id: ec2
+        run: |
+          EC2_IP=$(aws ec2 describe-instances \
+            --instance-ids ${{ steps.ec2.outputs.instance_id }} \
+            --query "Reservations[0].Instances[0].PrivateIpAddress" \
+            --output text)
+
+          echo "ec2_private_ip=$EC2_IP"
+          echo "ec2_private_ip=$EC2_IP" >> "$GITHUB_OUTPUT"
+
+      # - name: Create Target Group
+      #   id: tg
+      #   run: |
+      #     TG_ARN=$(aws elbv2 create-target-group \
+      #       --name qa-ec2-tg \
+      #       --protocol HTTP --port 80 \
+      #       --vpc-id ${{ secrets.AWS_VPC_ID }} \
+      #       --target-type ip \
+      #       --query 'TargetGroups[0].TargetGroupArn' --output text)
+      #     echo "tg_arn=$TG_ARN" >> $GITHUB_OUTPUT
+
+      # - name: Register EC2 with Target Group
+      #   run: |
+      #     aws elbv2 register-targets \
+      #       --target-group-arn ${{ steps.tg.outputs.tg_arn }} \
+      #       --targets Id=${{ steps.ip.outputs.ec2_private_ip }}
+
+      # - name: Create ALB
+      #   id: alb
+      #   run: |
+      #     ALB_ARN=$(aws elbv2 create-load-balancer \
+      #       --name qa-alb \
+      #       --subnets ${{ secrets.AWS_PUBLIC_SUBNET_1 }} ${{ secrets.AWS_PUBLIC_SUBNET_2 }} \
+      #       --security-groups ${{ secrets.AWS_QA_SECURITY_GROUP_ID }} \
+      #       --scheme internet-facing \
+      #       --query 'LoadBalancers[0].LoadBalancerArn' --output text)
+      #     DNS=$(aws elbv2 describe-load-balancers \
+      #       --load-balancer-arns $ALB_ARN \
+      #       --query 'LoadBalancers[0].DNSName' --output text)
+      #     echo "alb_arn=$ALB_ARN" >> $GITHUB_OUTPUT
+      #     echo "alb_dns=$DNS" >> $GITHUB_OUTPUT
+
+      # - name: Create Listener for ALB
+      #   run: |
+      #     aws elbv2 create-listener \
+      #       --load-balancer-arn ${{ steps.alb.outputs.alb_arn }} \
+      #       --protocol HTTP \
+      #       --port 80 \
+      #       --default-actions Type=forward,TargetGroupArn=${{ steps.tg.outputs.tg_arn }}
+
+      # - name: Update Route 53 A Record for QA
+      #   run: |
+      #     cat > change-batch.json <<EOF
+      #     {
+      #       "Comment": "Update A record for QA ALB",
+      #       "Changes": [{
+      #         "Action": "UPSERT",
+      #         "ResourceRecordSet": {
+      #           "Name": "${{ secrets.QA_RECORD_NAME }}",
+      #           "Type": "CNAME",
+      #           "TTL": 300,
+      #           "ResourceRecords": [{ "Value": "${{ steps.alb.outputs.alb_dns }}" }]
+      #         }
+      #       }]
+      #     }
+      #     EOF
+
+      #     aws route53 change-resource-record-sets \
+      #       --hosted-zone-id "${{ secrets.HOSTED_ZONE_ID }}" \
+      #       --change-batch file://change-batch.json
