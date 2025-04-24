@@ -43,9 +43,9 @@ jobs:
 
       - name: Set up kubectl
         if: steps.check-tags.outputs.changed == 'true'
-        uses: azure/setup-kubectl@v3
+        uses: azure/setup-kubectl@v4
         with:
-          version: '1.27.0'
+          version: 'latest'
 
       - name: Update kubeconfig
         if: steps.check-tags.outputs.changed == 'true'
