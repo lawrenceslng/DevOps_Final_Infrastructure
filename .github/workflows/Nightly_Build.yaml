@@ -66,13 +66,10 @@ jobs:
           needs.check-for-changes.outputs.product_changed == 'true' ||
           needs.check-for-changes.outputs.order_changed == 'true' ||
           needs.check-for-changes.outputs.frontend_changed == 'true'
-        runs-on: ubuntu-latest
-        steps:
-          - name: Upload New SHAs
-            uses: actions/upload-artifact@v4
-            with:
-              name: last-nightly-shas
-              path: new-shas/
+        uses: actions/upload-artifact@v4
+        with:
+          name: last-nightly-shas
+          path: new-shas/
   
   build-cart:
     name: Build & Push Cart Image
