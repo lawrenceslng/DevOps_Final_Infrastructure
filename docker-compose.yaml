@@ -79,9 +79,6 @@ services:
       dockerfile: Dockerfile
     container_name: frontend
     environment:
-      NEXT_PUBLIC_PRODUCT_SERVICE_URL: http://localhost:3003
-      NEXT_PUBLIC_ORDER_SERVICE_URL: http://localhost:3001
-      NEXT_PUBLIC_CART_SERVICE_URL: http://localhost:3002
       PORT: 3000
     ports:
       - "3000:3000"
@@ -89,6 +86,8 @@ services:
       - product-service
       - order-service
       - cart-service
+    volumes:
+      - ../Frontend/public/env-config.js:/app/public/env-config.js 
     restart: unless-stopped
 
 volumes:
