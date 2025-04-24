@@ -1,0 +1,31 @@
+# Green frontend deployment (new version for promotion)
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: frontend-green
+  namespace: prod
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: frontend
+      version: green
+  template:
+    metadata:
+      labels:
+        app: frontend
+        version: green
+    spec:
+      containers:
+        - name: frontend
+          image: <your-ecr-repo>/frontend:green
+          ports:
+            - containerPort: 3000
+          volumeMounts:
+            - name: env-config
+              mountPath: /app/public/env-config.js
+              subPath: env-config.js
+      volumes:
+        - name: env-config
+          configMap:
+            name: frontend-env-config

@@ -1,0 +1,30 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: frontend-blue
+  namespace: prod
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: frontend
+      version: blue
+  template:
+    metadata:
+      labels:
+        app: frontend
+        version: blue
+    spec:
+      containers:
+        - name: frontend
+          image: <your-ecr-repo>/frontend:blue
+          ports:
+            - containerPort: 3000
+          volumeMounts:
+            - name: env-config
+              mountPath: /app/public/env-config.js
+              subPath: env-config.js
+      volumes:
+        - name: env-config
+          configMap:
+            name: env-config

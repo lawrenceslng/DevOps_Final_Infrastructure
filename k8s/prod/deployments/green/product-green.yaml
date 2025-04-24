@@ -1,0 +1,22 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: product-green
+  namespace: prod
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: product-service
+      version: green
+  template:
+    metadata:
+      labels:
+        app: product-service
+        version: green
+    spec:
+      containers:
+        - name: product
+          image: <your-ecr-repo>/product-service:green
+          ports:
+            - containerPort: 3002

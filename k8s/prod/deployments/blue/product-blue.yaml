@@ -1,0 +1,23 @@
+# Product Blue
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: product-blue
+  namespace: prod
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: product-service
+      version: blue
+  template:
+    metadata:
+      labels:
+        app: product-service
+        version: blue
+    spec:
+      containers:
+        - name: product
+          image: <your-ecr-repo>/product-service:blue
+          ports:
+            - containerPort: 3003
