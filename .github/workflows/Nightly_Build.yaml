@@ -59,6 +59,20 @@ jobs:
           chmod +x ./Infra/scripts/check-shas.sh
           ./Infra/scripts/check-shas.sh > result.env
           cat result.env >> $GITHUB_OUTPUT
+
+      - name: Save Commit SHAs
+        if: |
+          needs.check-for-changes.outputs.cart_changed == 'true' ||
+          needs.check-for-changes.outputs.product_changed == 'true' ||
+          needs.check-for-changes.outputs.order_changed == 'true' ||
+          needs.check-for-changes.outputs.frontend_changed == 'true'
+        runs-on: ubuntu-latest
+        steps:
+          - name: Upload New SHAs
+            uses: actions/upload-artifact@v4
+            with:
+              name: last-nightly-shas
+              path: new-shas/
   
   build-cart:
     name: Build & Push Cart Image
@@ -182,30 +196,9 @@ jobs:
 
       - name: Build and Push Docker Image
         run: |
-          cd Frontend && npm ci && npm run build
+          # cd Frontend && npm ci && npm run build
           IMAGE_TAG=nightly-$(date +%Y%m%d)
           IMAGE_URI=${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ secrets.AWS_ACCOUNT_REGION }}.amazonaws.com/frontend:$IMAGE_TAG
 
           docker build -t $IMAGE_URI .
           docker push $IMAGE_URI
-
-  save-commit-shas:
-    name: Save Commit SHAs
-    needs:
-      - check-for-changes
-      - build-cart
-      - build-product
-      - build-order
-      - build-frontend
-    if: |
-      needs.check-for-changes.outputs.cart_changed == 'true' ||
-      needs.check-for-changes.outputs.product_changed == 'true' ||
-      needs.check-for-changes.outputs.order_changed == 'true' ||
-      needs.check-for-changes.outputs.frontend_changed == 'true'
-    runs-on: ubuntu-latest
-    steps:
-      - name: Upload New SHAs
-        uses: actions/upload-artifact@v4
-        with:
-          name: last-nightly-shas
-          path: new-shas/

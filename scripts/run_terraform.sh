@@ -1,6 +1,6 @@
 #!/bin/bash
 
-echo $(pwd)
+# echo $(pwd)
 
 cd ../terraform
 
