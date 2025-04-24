@@ -94,10 +94,18 @@ jobs:
       - name: Build and Push Docker Image
         run: |
           IMAGE_TAG=nightly-$(date +%Y%m%d%H%M%S)
-          IMAGE_URI=${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ secrets.AWS_ACCOUNT_REGION }}.amazonaws.com/cart-service:$IMAGE_TAG
+          REPO_URI=${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ secrets.AWS_ACCOUNT_REGION }}.amazonaws.com/cart-service
+          IMAGE_URI=$REPO_URI:$IMAGE_TAG
 
+          # Build the image
           docker build -t $IMAGE_URI ./Cart
+
+          # Tag as nightly-latest
+          docker tag $IMAGE_URI $REPO_URI:nightly-latest
+
+          # Push both tags
           docker push $IMAGE_URI
+          docker push $REPO_URI:nightly-latest
 
   build-product:
     name: Build & Push Product Image
@@ -126,10 +134,18 @@ jobs:
       - name: Build and Push Docker Image
         run: |
           IMAGE_TAG=nightly-$(date +%Y%m%d%H%M%S)
-          IMAGE_URI=${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ secrets.AWS_ACCOUNT_REGION }}.amazonaws.com/product-service:$IMAGE_TAG
+                    REPO_URI=${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ secrets.AWS_ACCOUNT_REGION }}.amazonaws.com/product-service
+          IMAGE_URI=$REPO_URI:$IMAGE_TAG
 
+          # Build the image
           docker build -t $IMAGE_URI ./Product
+
+          # Tag as nightly-latest
+          docker tag $IMAGE_URI $REPO_URI:nightly-latest
+
+          # Push both tags
           docker push $IMAGE_URI
+          docker push $REPO_URI:nightly-latest
 
   build-order:
     name: Build & Push Order Image
@@ -158,10 +174,18 @@ jobs:
       - name: Build and Push Docker Image
         run: |
           IMAGE_TAG=nightly-$(date +%Y%m%d%H%M%S)
-          IMAGE_URI=${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ secrets.AWS_ACCOUNT_REGION }}.amazonaws.com/order-service:$IMAGE_TAG
+          REPO_URI=${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ secrets.AWS_ACCOUNT_REGION }}.amazonaws.com/order-service
+          IMAGE_URI=$REPO_URI:$IMAGE_TAG
 
+          # Build the image
           docker build -t $IMAGE_URI ./Order
+
+          # Tag as nightly-latest
+          docker tag $IMAGE_URI $REPO_URI:nightly-latest
+
+          # Push both tags
           docker push $IMAGE_URI
+          docker push $REPO_URI:nightly-latest
 
   build-frontend:
     name: Build & Push Frontend Image
@@ -191,7 +215,15 @@ jobs:
         run: |
           # cd Frontend && npm ci && npm run build
           IMAGE_TAG=nightly-$(date +%Y%m%d%H%M%S)
-          IMAGE_URI=${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ secrets.AWS_ACCOUNT_REGION }}.amazonaws.com/frontend:$IMAGE_TAG
+                    REPO_URI=${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ secrets.AWS_ACCOUNT_REGION }}.amazonaws.com/frontend
+          IMAGE_URI=$REPO_URI:$IMAGE_TAG
 
+          # Build the image
           docker build -t $IMAGE_URI ./Frontend
+
+          # Tag as nightly-latest
+          docker tag $IMAGE_URI $REPO_URI:nightly-latest
+
+          # Push both tags
           docker push $IMAGE_URI
+          docker push $REPO_URI:nightly-latest

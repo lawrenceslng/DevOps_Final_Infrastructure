@@ -31,6 +31,7 @@ AVAILABILITY_ZONES=$(jq -r '.azs.value | join(",")' "$TF_OUTPUT_FILE")
 WORKER_GROUP_ONE_SG_ID=$(jq -r '.worker_group_mgmt_one_sg_id.value' "$TF_OUTPUT_FILE")
 WORKER_GROUP_TWO_SG_ID=$(jq -r '.worker_group_mgmt_two_sg_id.value' "$TF_OUTPUT_FILE")
 ALL_WORKER_SG_ID=$(jq -r '.all_worker_mgmt_sg_id.value' "$TF_OUTPUT_FILE")
+QA_SG_ID=$(jq -r '.qa_sg_id.value' "$TF_OUTPUT_FILE")
 
 # Write to file
 cat > eks-args.env <<EOF
@@ -47,6 +48,7 @@ AVAILABILITY_ZONES="$AVAILABILITY_ZONES"
 WORKER_GROUP_ONE_SG_ID="$WORKER_GROUP_ONE_SG_ID"
 WORKER_GROUP_TWO_SG_ID="$WORKER_GROUP_TWO_SG_ID"
 ALL_WORKER_SG_ID="$ALL_WORKER_SG_ID"
+QA_SG_ID="$QA_SG_ID"
 EOF
 
 echo "✅ EKS configuration written to eks-args.env"

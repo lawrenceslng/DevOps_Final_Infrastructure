@@ -13,7 +13,7 @@ packer {
 }
 
 source "amazon-ebs" "ubuntu" {
-  ami_name      = "QA_AMI"
+  ami_name      = "QA_AMI_2"
   instance_type = "t2.micro"
   region        = "us-east-1"
   source_ami    = "ami-084568db4383264d4"
@@ -25,6 +25,11 @@ build {
   sources = [
     "source.amazon-ebs.ubuntu"
   ]
+  provisioner "file" {
+    source      = "../terraform/init.sql"
+    destination = "/home/ubuntu/init.sql"
+  }
+
   provisioner "shell" {
     inline = [
       "curl -fsSL https://get.docker.com -o get-docker.sh",
@@ -32,6 +37,13 @@ build {
 
       "sudo service docker start",
       "sudo usermod -a -G docker ubuntu",
+
+      "sudo mkdir -p /opt/init-sql",
+      "sudo mv /home/ubuntu/init.sql /opt/init-sql/init-qa.sql",
+      "sudo chown -R ubuntu:ubuntu /opt/init-sql",
+      "ls -la /opt/init-sql",
+
+
       "mkdir -p /home/ubuntu/.ssh",
       "chmod 700 /home/ubuntu/.ssh",
 
