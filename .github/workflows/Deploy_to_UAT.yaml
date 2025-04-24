@@ -1,8 +1,8 @@
 name: Deploy to UAT
 
 on:
-  schedule:
-    - cron: '0 * * * *'  # optional: hourly check
+  # schedule:
+  #   - cron: '0 * * * *'  # optional: hourly check
   workflow_dispatch:
 
 jobs:

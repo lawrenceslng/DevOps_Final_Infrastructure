@@ -1,8 +1,8 @@
 name: Promote Green Deployment to Live
 
 on:
-  schedule:
-    - cron: '0 * * * *'  # every hour (or adjust as needed)
+  # schedule:
+  #   - cron: '0 * * * *'  # every hour (or adjust as needed)
   workflow_dispatch:
 
 jobs:
