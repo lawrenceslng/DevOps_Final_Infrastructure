@@ -53,7 +53,25 @@ output "qa_sg_id" {
   value       = aws_security_group.qa_ec2_group.id
 }
 
+output "lb_sg_id" {
+  description = "The ID of the load_balancer_sg security group"
+  value       = aws_security_group.load_balancer_sg.id
+}
+
+
 output "hosted_zone_id" {
   description = "The ID of the Route 53 hosted zone"
   value       = aws_route53_zone.main.zone_id
+}
+
+# Output RDS endpoint
+output "rds_endpoint" {
+  description = "RDS Endpoint"
+  value       = aws_db_instance.prod_db.endpoint
+}
+
+# Output Valkey endpoint
+output "valkey_primary_endpoint" {
+  description = "Primary Valkey endpoint"
+  value       = aws_elasticache_replication_group.valkey.primary_endpoint_address
 }
