@@ -86,6 +86,10 @@ jobs:
           if ! git diff --cached --quiet; then
             echo "✅ Committing updated LATEST_SHAS.txt..."
             git commit -m "Update LATEST_SHAS.txt from nightly build"
+
+            # Set GitHub token-based URL
+            git remote set-url origin https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/lawrenceslng/DevOps_Final_Infrastructure.git
+
             git push origin HEAD
           else
             echo "⚠️ No changes to commit in LATEST_SHAS.txt"
