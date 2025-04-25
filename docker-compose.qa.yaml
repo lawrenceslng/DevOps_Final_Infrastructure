@@ -71,10 +71,6 @@ services:
     container_name: frontend
     ports:
       - "3000:80"
-    environment:
-      PRODUCT_SERVICE_URL: http://qa-alb-1509594949.us-east-1.elb.amazonaws.com
-      ORDER_SERVICE_URL: http://qa-alb-1509594949.us-east-1.elb.amazonaws.com
-      CART_SERVICE_URL: http://qa-alb-1509594949.us-east-1.elb.amazonaws.com
     depends_on:
       - product-service
       - order-service

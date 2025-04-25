@@ -83,7 +83,7 @@ jobs:
           scp -o StrictHostKeyChecking=no \
               -o ProxyCommand="ssh -o StrictHostKeyChecking=no -i ~/.ssh/id_rsa ubuntu@${{ steps.bastion-ip.outputs.bastion_ip }} -W %h:%p" \
               -i ~/.ssh/id_rsa \
-              ./docker-compose.qa.yaml \
+              ./Infra/docker-compose.qa.yaml \
               ubuntu@${{ steps.ec2.outputs.ec2_private_ip }}:/home/ubuntu/docker-compose.yaml
 
       - name: SSH to Bastion → Private EC2 and run setup
