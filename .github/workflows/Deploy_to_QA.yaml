@@ -76,6 +76,16 @@ jobs:
           echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/id_rsa
           chmod 600 ~/.ssh/id_rsa
 
+      - name: SCP docker-compose.qa.yaml to private EC2 via Bastion
+        run: |
+          echo "📦 Copying docker-compose.qa.yaml via Bastion → Private EC2"
+
+          scp -o StrictHostKeyChecking=no \
+              -o ProxyCommand="ssh -o StrictHostKeyChecking=no -i ~/.ssh/id_rsa ubuntu@${{ steps.bastion-ip.outputs.bastion_ip }} -W %h:%p" \
+              -i ~/.ssh/id_rsa \
+              ./docker-compose.qa.yaml \
+              ubuntu@${{ steps.ec2.outputs.ec2_private_ip }}:/home/ubuntu/docker-compose.yaml
+
       - name: SSH to Bastion → Private EC2 and run setup
         run: |
           echo "🔐 Connecting to Bastion Host at ${{ steps.bastion-ip.outputs.bastion_ip }}"
@@ -91,6 +101,9 @@ jobs:
               aws configure set region ${{ secrets.AWS_ACCOUNT_REGION}}
 
               aws ecr get-login-password --region us-east-1 | docker login --username AWS --password-stdin ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ secrets.AWS_ACCOUNT_REGION }}.amazonaws.com
+
+              echo "🚀 Starting services via Docker Compose..."
+              docker compose -f docker-compose.yaml up -d
 
               echo "✅ Done with setup on EC2."
           EOF
@@ -117,7 +130,7 @@ jobs:
         run: |
           ALB_ARN=$(aws elbv2 create-load-balancer \
             --name qa-alb \
-            --subnets ${{ secrets.AWS_PUBLIC_SUBNET_ID }} \
+            --subnets ${{ secrets.AWS_PUBLIC_SUBNET_ID }} ${{ secrets.AWS_PUBLIC_SUBNET_ID_2 }} ${{ secrets.AWS_PUBLIC_SUBNET_ID_3 }} \
             --security-groups ${{ secrets.AWS_QA_SECURITY_GROUP_ID }} \
             --scheme internet-facing \
             --query 'LoadBalancers[0].LoadBalancerArn' --output text)
@@ -135,23 +148,23 @@ jobs:
             --port 80 \
             --default-actions Type=forward,TargetGroupArn=${{ steps.tg.outputs.tg_arn }}
 
-      # - name: Update Route 53 A Record for QA
-      #   run: |
-      #     cat > change-batch.json <<EOF
-      #     {
-      #       "Comment": "Update A record for QA ALB",
-      #       "Changes": [{
-      #         "Action": "UPSERT",
-      #         "ResourceRecordSet": {
-      #           "Name": "${{ secrets.QA_RECORD_NAME }}",
-      #           "Type": "CNAME",
-      #           "TTL": 300,
-      #           "ResourceRecords": [{ "Value": "${{ steps.alb.outputs.alb_dns }}" }]
-      #         }
-      #       }]
-      #     }
-      #     EOF
+      - name: Update Route 53 A Record for QA
+        run: |
+          cat > change-batch.json <<EOF
+          {
+            "Comment": "Update A record for QA ALB",
+            "Changes": [{
+              "Action": "UPSERT",
+              "ResourceRecordSet": {
+                "Name": "qa.codingwithboba.com",
+                "Type": "CNAME",
+                "TTL": 60,
+                "ResourceRecords": [{ "Value": "${{ steps.alb.outputs.alb_dns }}" }]
+              }
+            }]
+          }
+          EOF
 
-      #     aws route53 change-resource-record-sets \
-      #       --hosted-zone-id "${{ secrets.HOSTED_ZONE_ID }}" \
-      #       --change-batch file://change-batch.json
+          aws route53 change-resource-record-sets \
+            --hosted-zone-id "${{ secrets.HOSTED_ZONE_ID }}" \
+            --change-batch file://change-batch.json
