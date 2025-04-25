@@ -63,70 +63,70 @@ jobs:
         id: ec2
         run: |
           EC2_IP=$(aws ec2 describe-instances \
-            --instance-ids ${{ steps.ec2.outputs.instance_id }} \
+            --instance-ids ${{ steps.launch.outputs.instance_id }} \
             --query "Reservations[0].Instances[0].PrivateIpAddress" \
             --output text)
 
           echo "ec2_private_ip=$EC2_IP"
           echo "ec2_private_ip=$EC2_IP" >> "$GITHUB_OUTPUT"
 
-      # - name: Create Target Group
-      #   id: tg
-      #   run: |
-      #     TG_ARN=$(aws elbv2 create-target-group \
-      #       --name qa-ec2-tg \
-      #       --protocol HTTP --port 80 \
-      #       --vpc-id ${{ secrets.AWS_VPC_ID }} \
-      #       --target-type ip \
-      #       --query 'TargetGroups[0].TargetGroupArn' --output text)
-      #     echo "tg_arn=$TG_ARN" >> $GITHUB_OUTPUT
+      - name: Create Target Group
+        id: tg
+        run: |
+          TG_ARN=$(aws elbv2 create-target-group \
+            --name qa-ec2-tg \
+            --protocol HTTP --port 80 \
+            --vpc-id ${{ secrets.AWS_VPC_ID }} \
+            --target-type ip \
+            --query 'TargetGroups[0].TargetGroupArn' --output text)
+          echo "tg_arn=$TG_ARN" >> $GITHUB_OUTPUT
 
-      # - name: Register EC2 with Target Group
-      #   run: |
-      #     aws elbv2 register-targets \
-      #       --target-group-arn ${{ steps.tg.outputs.tg_arn }} \
-      #       --targets Id=${{ steps.ip.outputs.ec2_private_ip }}
+      - name: Register EC2 with Target Group
+        run: |
+          aws elbv2 register-targets \
+            --target-group-arn ${{ steps.tg.outputs.tg_arn }} \
+            --targets Id=${{ steps.ip.outputs.ec2_private_ip }}
 
-      # - name: Create ALB
-      #   id: alb
-      #   run: |
-      #     ALB_ARN=$(aws elbv2 create-load-balancer \
-      #       --name qa-alb \
-      #       --subnets ${{ secrets.AWS_PUBLIC_SUBNET_1 }} ${{ secrets.AWS_PUBLIC_SUBNET_2 }} \
-      #       --security-groups ${{ secrets.AWS_QA_SECURITY_GROUP_ID }} \
-      #       --scheme internet-facing \
-      #       --query 'LoadBalancers[0].LoadBalancerArn' --output text)
-      #     DNS=$(aws elbv2 describe-load-balancers \
-      #       --load-balancer-arns $ALB_ARN \
-      #       --query 'LoadBalancers[0].DNSName' --output text)
-      #     echo "alb_arn=$ALB_ARN" >> $GITHUB_OUTPUT
-      #     echo "alb_dns=$DNS" >> $GITHUB_OUTPUT
+      - name: Create ALB
+        id: alb
+        run: |
+          ALB_ARN=$(aws elbv2 create-load-balancer \
+            --name qa-alb \
+            --subnets ${{ secrets.AWS_PUBLIC_SUBNET_1 }} ${{ secrets.AWS_PUBLIC_SUBNET_2 }} \
+            --security-groups ${{ secrets.AWS_QA_SECURITY_GROUP_ID }} \
+            --scheme internet-facing \
+            --query 'LoadBalancers[0].LoadBalancerArn' --output text)
+          DNS=$(aws elbv2 describe-load-balancers \
+            --load-balancer-arns $ALB_ARN \
+            --query 'LoadBalancers[0].DNSName' --output text)
+          echo "alb_arn=$ALB_ARN" >> $GITHUB_OUTPUT
+          echo "alb_dns=$DNS" >> $GITHUB_OUTPUT
 
-      # - name: Create Listener for ALB
-      #   run: |
-      #     aws elbv2 create-listener \
-      #       --load-balancer-arn ${{ steps.alb.outputs.alb_arn }} \
-      #       --protocol HTTP \
-      #       --port 80 \
-      #       --default-actions Type=forward,TargetGroupArn=${{ steps.tg.outputs.tg_arn }}
+      - name: Create Listener for ALB
+        run: |
+          aws elbv2 create-listener \
+            --load-balancer-arn ${{ steps.alb.outputs.alb_arn }} \
+            --protocol HTTP \
+            --port 80 \
+            --default-actions Type=forward,TargetGroupArn=${{ steps.tg.outputs.tg_arn }}
 
-      # - name: Update Route 53 A Record for QA
-      #   run: |
-      #     cat > change-batch.json <<EOF
-      #     {
-      #       "Comment": "Update A record for QA ALB",
-      #       "Changes": [{
-      #         "Action": "UPSERT",
-      #         "ResourceRecordSet": {
-      #           "Name": "${{ secrets.QA_RECORD_NAME }}",
-      #           "Type": "CNAME",
-      #           "TTL": 300,
-      #           "ResourceRecords": [{ "Value": "${{ steps.alb.outputs.alb_dns }}" }]
-      #         }
-      #       }]
-      #     }
-      #     EOF
+      - name: Update Route 53 A Record for QA
+        run: |
+          cat > change-batch.json <<EOF
+          {
+            "Comment": "Update A record for QA ALB",
+            "Changes": [{
+              "Action": "UPSERT",
+              "ResourceRecordSet": {
+                "Name": "${{ secrets.QA_RECORD_NAME }}",
+                "Type": "CNAME",
+                "TTL": 300,
+                "ResourceRecords": [{ "Value": "${{ steps.alb.outputs.alb_dns }}" }]
+              }
+            }]
+          }
+          EOF
 
-      #     aws route53 change-resource-record-sets \
-      #       --hosted-zone-id "${{ secrets.HOSTED_ZONE_ID }}" \
-      #       --change-batch file://change-batch.json
+          aws route53 change-resource-record-sets \
+            --hosted-zone-id "${{ secrets.HOSTED_ZONE_ID }}" \
+            --change-batch file://change-batch.json
