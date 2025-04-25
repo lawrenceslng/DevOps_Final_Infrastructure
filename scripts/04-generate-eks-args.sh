@@ -34,6 +34,9 @@ WORKER_GROUP_TWO_SG_ID=$(jq -r '.worker_group_mgmt_two_sg_id.value' "$TF_OUTPUT_
 ALL_WORKER_SG_ID=$(jq -r '.all_worker_mgmt_sg_id.value' "$TF_OUTPUT_FILE")
 QA_SG_ID=$(jq -r '.qa_sg_id.value' "$TF_OUTPUT_FILE")
 LB_SG_ID=$(jq -r '.lb_sg_id.value' "$TF_OUTPUT_FILE")
+HOSTED_ZONE_ID=$(jq -r '.hosted_zone_id.value' "$TF_OUTPUT_FILE")
+RDS_ENDPOINT=$(jq -r '.rds_endpoint.value' "$TF_OUTPUT_FILE")
+VALKEY_PRIMARY_ENDPOINT=$(jq -r '.valkey_primary_endpoint.value' "$TF_OUTPUT_FILE")
 
 # Write to file
 cat > eks-args.env <<EOF
@@ -53,6 +56,9 @@ WORKER_GROUP_TWO_SG_ID="$WORKER_GROUP_TWO_SG_ID"
 ALL_WORKER_SG_ID="$ALL_WORKER_SG_ID"
 QA_SG_ID="$QA_SG_ID"
 LB_SG_ID="$LB_SG_ID"
+HOSTED_ZONE_ID="$HOSTED_ZONE_ID"
+RDS_ENDPOINT="$RDS_ENDPOINT"
+VALKEY_PRIMARY_ENDPOINT="$VALKEY_PRIMARY_ENDPOINT"
 EOF
 
 echo "✅ EKS configuration written to eks-args.env"
