@@ -128,7 +128,7 @@ jobs:
         run: |
           aws elbv2 register-targets \
             --target-group-arn ${{ steps.tg.outputs.tg_arn }} \
-            --targets Id=${{ steps.ip.outputs.ec2_private_ip }}
+            --targets Id=${{ steps.ec2.outputs.ec2_private_ip }}
 
       - name: Create ALB
         id: alb
