@@ -1,0 +1,86 @@
+version: '3.8'
+
+services:
+  mysql:
+    image: mysql:8.0
+    container_name: mysql
+    environment:
+      MYSQL_ROOT_PASSWORD: root
+      MYSQL_DATABASE: productdb
+    ports:
+      - "3306:3306"
+    volumes:
+      - mysql_data:/var/lib/mysql
+      - /opt/init-sql/init-qa.sql:/docker-entrypoint-initdb.d/init-qa.sql
+    command: --default-authentication-plugin=mysql_native_password
+    restart: unless-stopped
+
+  redis:
+    image: redis:7.0-alpine
+    container_name: redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    restart: unless-stopped
+
+  product-service:
+    image: 677005902461.dkr.ecr.us-east-1.amazonaws.com/product-service:nightly-latest
+    container_name: product-service
+    environment:
+      DB_HOST: mysql
+      DB_USER: root
+      DB_PASSWORD: root
+      DB_NAME: productdb
+      PORT: 3003
+    ports:
+      - "3003:3003"
+    depends_on:
+      - mysql
+    restart: unless-stopped
+
+  order-service:
+    image: 677005902461.dkr.ecr.us-east-1.amazonaws.com/order-service:nightly-latest
+    container_name: order-service
+    environment:
+      DB_HOST: mysql
+      DB_USER: root
+      DB_PASSWORD: root
+      DB_NAME: orderdb
+      PORT: 3001
+    ports:
+      - "3001:3001"
+    depends_on:
+      - mysql
+    restart: unless-stopped
+
+  cart-service:
+    image: 677005902461.dkr.ecr.us-east-1.amazonaws.com/cart-service:nightly-latest
+    container_name: cart-service
+    environment:
+      REDIS_URL: redis://redis:6379
+      PORT: 3002
+    ports:
+      - "3002:3002"
+    depends_on:
+      - redis
+    restart: unless-stopped
+
+  frontend:
+    image: 677005902461.dkr.ecr.us-east-1.amazonaws.com/frontend:nightly-latest
+    container_name: frontend
+    ports:
+      - "3000:80"
+    environment:
+      PRODUCT_SERVICE_URL: http://qa-alb-1509594949.us-east-1.elb.amazonaws.com
+      ORDER_SERVICE_URL: http://qa-alb-1509594949.us-east-1.elb.amazonaws.com
+      CART_SERVICE_URL: http://qa-alb-1509594949.us-east-1.elb.amazonaws.com
+    depends_on:
+      - product-service
+      - order-service
+      - cart-service 
+    restart: unless-stopped
+
+volumes:
+  mysql_data:
+  redis_data:

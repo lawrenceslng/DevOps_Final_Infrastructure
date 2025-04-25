@@ -70,6 +70,31 @@ jobs:
           echo "ec2_private_ip=$EC2_IP"
           echo "ec2_private_ip=$EC2_IP" >> "$GITHUB_OUTPUT"
 
+      - name: Setup SSH Key
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/id_rsa
+          chmod 600 ~/.ssh/id_rsa
+
+      - name: SSH to Bastion → Private EC2 and run setup
+        run: |
+          echo "🔐 Connecting to Bastion Host at ${{ steps.bastion-ip.outputs.bastion_ip }}"
+
+          ssh -o StrictHostKeyChecking=no -o ProxyCommand="ssh -o StrictHostKeyChecking=no -i ~/.ssh/id_rsa ubuntu@${{ steps.bastion-ip.outputs.bastion_ip }} -W %h:%p" \
+              -i ~/.ssh/id_rsa ubuntu@${{ steps.ec2.outputs.ec2_private_ip }} << 'EOF'
+
+              echo "⚙️ Running AWS configuration and ECR login..."
+
+              aws configure set aws_access_key_id ${{ secrets.AWS_ACCESS_KEY_ID }}
+              aws configure set aws_secret_access_key ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+              aws configure set aws_session_token ${{ secrets.AWS_SESSION_TOKEN }}
+              aws configure set region ${{ secrets.AWS_ACCOUNT_REGION}}
+
+              aws ecr get-login-password --region us-east-1 | docker login --username AWS --password-stdin ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ secrets.AWS_ACCOUNT_REGION }}.amazonaws.com
+
+              echo "✅ Done with setup on EC2."
+          EOF
+
       - name: Create Target Group
         id: tg
         run: |

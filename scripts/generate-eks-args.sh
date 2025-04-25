@@ -23,6 +23,7 @@ source "$ENV_VAR_FILE"
 
 # Extract values
 PRIVATE_SUBNETS=$(jq -r '.private_subnets.value | join(",")' "$TF_OUTPUT_FILE")
+PRIVATE_SUBNETS_SPACE_SEPARATED=$(jq -r '.private_subnets.value | join(" ")' "$TF_OUTPUT_FILE")
 PUBLIC_SUBNETS=$(jq -r '.public_subnets.value | join(",")' "$TF_OUTPUT_FILE")
 VPC_ID=$(jq -r '.vpc_id.value' "$TF_OUTPUT_FILE")
 VPC_CIDR=$(jq -r '.vpc_cidr_block.value' "$TF_OUTPUT_FILE")
@@ -41,6 +42,7 @@ EKS_CLUSTER_NAME="$EKS_CLUSTER_NAME"
 AWS_REGION="$AWS_REGION"
 AWS_ROLE="$AWS_ROLE"
 PRIVATE_SUBNETS="$PRIVATE_SUBNETS"
+PRIVATE_SUBNETS_SPACE_SEPARATED="$PRIVATE_SUBNETS_SPACE_SEPARATED"
 PUBLIC_SUBNETS="$PUBLIC_SUBNETS"
 VPC_ID="$VPC_ID"
 VPC_CIDR="$VPC_CIDR"
