@@ -72,9 +72,8 @@ jobs:
 
       - name: Setup SSH Key
         run: |
-          mkdir -p ~/.ssh
-          echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/id_rsa
-          chmod 600 ~/.ssh/id_rsa
+          echo "${{ secrets.SSH_PRIVATE_KEY }}" | base64 --decode > key.pem
+          chmod 600 key.pem
 
       - name: Checkout Infrastructure Repository
         uses: actions/checkout@v4
@@ -86,8 +85,8 @@ jobs:
           echo "📦 Copying docker-compose.qa.yaml via Bastion → Private EC2"
 
           scp -o StrictHostKeyChecking=no \
-              -o ProxyCommand="ssh -o StrictHostKeyChecking=no -i ~/.ssh/id_rsa ubuntu@${{ steps.bastion-ip.outputs.bastion_ip }} -W %h:%p" \
-              -i ~/.ssh/id_rsa \
+              -o ProxyCommand="ssh -o StrictHostKeyChecking=no -i key.pem ubuntu@${{ steps.bastion-ip.outputs.bastion_ip }} -W %h:%p" \
+              -i key.pem \
               ./Infra/docker-compose.qa.yaml \
               ubuntu@${{ steps.ec2.outputs.ec2_private_ip }}:/home/ubuntu/docker-compose.yaml
 
