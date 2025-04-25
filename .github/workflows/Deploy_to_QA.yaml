@@ -82,7 +82,7 @@ jobs:
 
       - name: SCP docker-compose.qa.yaml to private EC2 via Bastion
         run: |
-          sleep 30
+          sleep 10
           echo "📦 Copying docker-compose.qa.yaml via Bastion → Private EC2"
 
           scp -o StrictHostKeyChecking=no \
@@ -95,8 +95,8 @@ jobs:
         run: |
           echo "🔐 Connecting to Bastion Host at ${{ steps.bastion-ip.outputs.bastion_ip }}"
 
-          ssh -o StrictHostKeyChecking=no -o ProxyCommand="ssh -o StrictHostKeyChecking=no -i ~/.ssh/id_rsa ubuntu@${{ steps.bastion-ip.outputs.bastion_ip }} -W %h:%p" \
-              -i ~/.ssh/id_rsa ubuntu@${{ steps.ec2.outputs.ec2_private_ip }} << 'EOF'
+          ssh -o StrictHostKeyChecking=no -o ProxyCommand="ssh -o StrictHostKeyChecking=no -i  key.pem ubuntu@${{ steps.bastion-ip.outputs.bastion_ip }} -W %h:%p" \
+              -i  key.pem ubuntu@${{ steps.ec2.outputs.ec2_private_ip }} << 'EOF'
 
               echo "⚙️ Running AWS configuration and ECR login..."
 
