@@ -18,17 +18,28 @@ jobs:
 
     steps:
       # Need to fix the artifact retrieval as it's not working
-      - name: Download last SHAs (if exists)
-        uses: actions/download-artifact@v4
-        with:
-          name: last-nightly-shas
-          path: old-shas
-        continue-on-error: true
+      # - name: Download last SHAs (if exists)
+      #   uses: actions/download-artifact@v4
+      #   with:
+      #     name: last-nightly-shas
+      #     path: old-shas
+      #   continue-on-error: true
 
       - name: Checkout Infrastructure Repository
         uses: actions/checkout@v4
         with:
           path: Infra
+
+      - name: Load Previous SHAs (if file exists)
+        id: load_shas
+        run: |
+          if [ -f Infra/LATEST_SHAS.txt ]; then
+            echo "Loading LATEST_SHAS.txt..."
+            cat Infra/LATEST_SHAS.txt
+            source Infra/LATEST_SHAS.txt
+          else
+            echo "LATEST_SHAS.txt not found, assuming fresh run."
+          fi
 
       - name: Checkout Cart Service Repository
         uses: actions/checkout@v4
@@ -57,16 +68,35 @@ jobs:
       - name: Compare SHAs
         id: set_outputs
         run: |
-          chmod +x ./Infra/scripts/check-shas.sh
-          ./Infra/scripts/check-shas.sh
+          chmod +x ./Infra/.github/scripts/check-shas.sh
+          ./Infra/.github/scripts/check-shas.sh
           cat result.env >> $GITHUB_OUTPUT
   
-      - name: Upload New SHAs
+      - name: Commit & Push Updated SHAs
         if: steps.set_outputs.outputs.cart_changed == 'true' || steps.set_outputs.outputs.product_changed == 'true' || steps.set_outputs.outputs.order_changed == 'true' || steps.set_outputs.outputs.frontend_changed == 'true'
-        uses: actions/upload-artifact@v4
-        with:
-          name: last-nightly-shas
-          path: new-shas/
+        run: |
+          cd Infra
+
+          git config user.name "github-actions"
+          git config user.email "github-actions@github.com"
+
+          git add LATEST_SHAS.txt
+
+          # Only commit if there's actually a change
+          if ! git diff --cached --quiet; then
+            echo "✅ Committing updated LATEST_SHAS.txt..."
+            git commit -m "Update LATEST_SHAS.txt from nightly build"
+            git push origin HEAD
+          else
+            echo "⚠️ No changes to commit in LATEST_SHAS.txt"
+          fi
+
+      # - name: Upload New SHAs
+      #   if: steps.set_outputs.outputs.cart_changed == 'true' || steps.set_outputs.outputs.product_changed == 'true' || steps.set_outputs.outputs.order_changed == 'true' || steps.set_outputs.outputs.frontend_changed == 'true'
+      #   uses: actions/upload-artifact@v4
+      #   with:
+      #     name: last-nightly-shas
+      #     path: new-shas/
 
   build-cart:
     name: Build & Push Cart Image
