@@ -220,7 +220,7 @@ jobs:
           IMAGE_URI=$REPO_URI:$IMAGE_TAG
 
           # Build the image
-          docker build -t $IMAGE_URI --build-arg NODE_ENV=production --build-arg EXPORT_BUILD=true ./Frontend
+          docker build -t $IMAGE_URI --build-arg NODE_ENV=production ./Frontend
 
           # Tag as nightly-latest
           docker tag $IMAGE_URI $REPO_URI:nightly-latest

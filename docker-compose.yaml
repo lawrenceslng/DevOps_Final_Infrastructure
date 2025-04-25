@@ -88,7 +88,9 @@ services:
       - order-service
       - cart-service
     volumes:
-      - ../Frontend/public/env-config.js:/app/public/env-config.js 
+      # - ../Frontend/public/env-config.js:/app/public/env-config.js 
+      - ../Frontend:/app
+      - /app/node_modules
     restart: unless-stopped
 
 volumes:
