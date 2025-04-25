@@ -76,6 +76,11 @@ jobs:
           echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/id_rsa
           chmod 600 ~/.ssh/id_rsa
 
+      - name: Checkout Infrastructure Repository
+        uses: actions/checkout@v4
+        with:
+          path: Infra
+
       - name: SCP docker-compose.qa.yaml to private EC2 via Bastion
         run: |
           echo "📦 Copying docker-compose.qa.yaml via Bastion → Private EC2"
