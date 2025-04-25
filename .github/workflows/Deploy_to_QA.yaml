@@ -53,6 +53,8 @@ jobs:
         id: bastion-ip
         run: |
           aws ec2 wait instance-running --instance-ids ${{ steps.bastion.outputs.bastion_id }}
+          echo "🧠 Waiting for EC2 to pass health checks..."
+          aws ec2 wait instance-status-ok --instance-ids ${{ steps.bastion.outputs.bastion_id }}
           PUBLIC_IP=$(aws ec2 describe-instances \
             --instance-ids ${{ steps.bastion.outputs.bastion_id }} \
             --query "Reservations[0].Instances[0].PublicIpAddress" --output text)
