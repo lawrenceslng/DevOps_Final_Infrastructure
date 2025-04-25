@@ -17,7 +17,7 @@ variable "profile" {
 
 variable "qa_ami_id" {
   type        = string
-  default     = "ami-067de7d4a91b4848f" # INSERT QA AMI ID HERE
+  default     = "ami-07e587502229962d6" # INSERT QA AMI ID HERE
   description = "Put Your QA AMI Here"
 }
 

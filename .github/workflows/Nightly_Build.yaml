@@ -17,6 +17,7 @@ jobs:
       frontend_changed: ${{ steps.set_outputs.outputs.frontend_changed }}
 
     steps:
+      # Need to fix the artifact retrieval as it's not working
       - name: Download last SHAs (if exists)
         uses: actions/download-artifact@v4
         with:
@@ -215,11 +216,11 @@ jobs:
         run: |
           # cd Frontend && npm ci && npm run build
           IMAGE_TAG=nightly-$(date +%Y%m%d%H%M%S)
-                    REPO_URI=${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ secrets.AWS_ACCOUNT_REGION }}.amazonaws.com/frontend
+          REPO_URI=${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ secrets.AWS_ACCOUNT_REGION }}.amazonaws.com/frontend
           IMAGE_URI=$REPO_URI:$IMAGE_TAG
 
           # Build the image
-          docker build -t $IMAGE_URI ./Frontend
+          docker build -t $IMAGE_URI --build-arg NODE_ENV=production ./Frontend
 
           # Tag as nightly-latest
           docker tag $IMAGE_URI $REPO_URI:nightly-latest

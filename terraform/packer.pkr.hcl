@@ -13,7 +13,7 @@ packer {
 }
 
 source "amazon-ebs" "ubuntu" {
-  ami_name      = "QA_AMI_2"
+  ami_name      = "QA_AMI"
   instance_type = "t2.micro"
   region        = "us-east-1"
   source_ami    = "ami-084568db4383264d4"
@@ -32,6 +32,11 @@ build {
 
   provisioner "shell" {
     inline = [
+      "sudo apt-get update",
+      "sudo apt install unzip",
+      "curl https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip -o awscliv2.zip",
+      "unzip awscliv2.zip",
+      "sudo ./aws/install",
       "curl -fsSL https://get.docker.com -o get-docker.sh",
       "sudo sh get-docker.sh",
 
