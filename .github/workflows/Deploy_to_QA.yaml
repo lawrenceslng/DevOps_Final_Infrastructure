@@ -92,7 +92,7 @@ jobs:
         run: |
           ALB_ARN=$(aws elbv2 create-load-balancer \
             --name qa-alb \
-            --subnets ${{ secrets.AWS_PUBLIC_SUBNET_1 }} ${{ secrets.AWS_PUBLIC_SUBNET_2 }} \
+            --subnets ${{ secrets.AWS_PUBLIC_SUBNET_ID }} \
             --security-groups ${{ secrets.AWS_QA_SECURITY_GROUP_ID }} \
             --scheme internet-facing \
             --query 'LoadBalancers[0].LoadBalancerArn' --output text)
@@ -110,23 +110,23 @@ jobs:
             --port 80 \
             --default-actions Type=forward,TargetGroupArn=${{ steps.tg.outputs.tg_arn }}
 
-      - name: Update Route 53 A Record for QA
-        run: |
-          cat > change-batch.json <<EOF
-          {
-            "Comment": "Update A record for QA ALB",
-            "Changes": [{
-              "Action": "UPSERT",
-              "ResourceRecordSet": {
-                "Name": "${{ secrets.QA_RECORD_NAME }}",
-                "Type": "CNAME",
-                "TTL": 300,
-                "ResourceRecords": [{ "Value": "${{ steps.alb.outputs.alb_dns }}" }]
-              }
-            }]
-          }
-          EOF
+      # - name: Update Route 53 A Record for QA
+      #   run: |
+      #     cat > change-batch.json <<EOF
+      #     {
+      #       "Comment": "Update A record for QA ALB",
+      #       "Changes": [{
+      #         "Action": "UPSERT",
+      #         "ResourceRecordSet": {
+      #           "Name": "${{ secrets.QA_RECORD_NAME }}",
+      #           "Type": "CNAME",
+      #           "TTL": 300,
+      #           "ResourceRecords": [{ "Value": "${{ steps.alb.outputs.alb_dns }}" }]
+      #         }
+      #       }]
+      #     }
+      #     EOF
 
-          aws route53 change-resource-record-sets \
-            --hosted-zone-id "${{ secrets.HOSTED_ZONE_ID }}" \
-            --change-batch file://change-batch.json
+      #     aws route53 change-resource-record-sets \
+      #       --hosted-zone-id "${{ secrets.HOSTED_ZONE_ID }}" \
+      #       --change-batch file://change-batch.json
