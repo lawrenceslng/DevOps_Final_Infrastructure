@@ -108,7 +108,7 @@ jobs:
               aws ecr get-login-password --region us-east-1 | docker login --username AWS --password-stdin ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ secrets.AWS_ACCOUNT_REGION }}.amazonaws.com
 
               echo "🚀 Starting services via Docker Compose..."
-              docker compose -f docker-compose.yaml up -d
+              nohup docker compose -f docker-compose.yaml up -d > /dev/null 2>&1 &
 
               echo "✅ Done with setup on EC2."
           EOF
