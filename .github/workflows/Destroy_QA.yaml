@@ -39,10 +39,10 @@ jobs:
             ${{ steps.find-qa.outputs.qa_instance_id }} \
             ${{ steps.find-bastion.outputs.bastion_id }}
 
-      - name: Wait for Instances to Terminate
-        run: |
-          aws ec2 wait instance-terminated \
-            --instance-ids ${{ steps.find-qa.outputs.qa_instance_id }} ${{ steps.find-bastion.outputs.bastion_id }}
+      # - name: Wait for Instances to Terminate
+      #   run: |
+      #     aws ec2 wait instance-terminated \
+      #       --instance-ids ${{ steps.find-qa.outputs.qa_instance_id }} ${{ steps.find-bastion.outputs.bastion_id }}
 
       - name: Find ALB
         id: alb
@@ -50,6 +50,10 @@ jobs:
           ALB_ARN=$(aws elbv2 describe-load-balancers \
             --names qa-alb \
             --query "LoadBalancers[0].LoadBalancerArn" --output text)
+          DNS=$(aws elbv2 describe-load-balancers \
+            --names qa-alb \
+            --query 'LoadBalancers[0].DNSName' --output text)
+          echo "alb_dns=$DNS" >> $GITHUB_OUTPUT
           echo "alb_arn=$ALB_ARN" >> "$GITHUB_OUTPUT"
 
       - name: Find Target Group
@@ -90,15 +94,13 @@ jobs:
                 "Name": "qa.codingwithboba.com",
                 "Type": "CNAME",
                 "TTL": 60,
-                "ResourceRecords": [{ "Value": "dummy-placeholder" }]
+                "ResourceRecords": [{ "Value": ${{ steps.alb.outputs.alb_dns }} }]
               }
             }]
           }
           EOF
 
-          CURRENT_ALB_DNS=$(aws elbv2 describe-load-balancers \
-            --names qa-alb \
-            --query "LoadBalancers[0].DNSName" --output text 2>/dev/null || echo "")
+          CURRENT_ALB_DNS=${{ steps.alb.outputs.alb_dns }}
 
           if [[ -n "$CURRENT_ALB_DNS" ]]; then
             sed -i "s/dummy-placeholder/$CURRENT_ALB_DNS/" change-batch.json
