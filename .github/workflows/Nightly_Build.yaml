@@ -176,11 +176,11 @@ jobs:
             echo "⚠️ No changes to commit in services.json"
           fi
 
-      - name: Mock Launching EC2 for Testing
-        id: launch-ec2
-        if: steps.set_outputs.outputs.cart_changed == 'true' || steps.set_outputs.outputs.product_changed == 'true' || steps.set_outputs.outputs.order_changed == 'true' || steps.set_outputs.outputs.frontend_changed == 'true'
-        run: |
-          echo "We can launch an EC2 for testing the nightly build"
+      # - name: Mock Launching EC2 for Testing
+      #   id: launch-ec2
+      #   if: steps.set_outputs.outputs.cart_changed == 'true' || steps.set_outputs.outputs.product_changed == 'true' || steps.set_outputs.outputs.order_changed == 'true' || steps.set_outputs.outputs.frontend_changed == 'true'
+      #   run: |
+      #     echo "We can launch an EC2 for testing the nightly build"
 
   build-cart:
     name: Build & Push Cart Image
@@ -358,6 +358,20 @@ jobs:
           # Push both tags
           docker push $IMAGE_URI
           docker push $REPO_URI:nightly-latest
+
+  launch-ec2:
+    name: Launch EC2 for Testing
+    needs:
+      - build-cart
+      - build-product
+      - build-order
+      - build-frontend
+    if: needs.build-cart.result == 'success' || needs.build-product.result == 'success' || needs.build-order.result == 'success' || needs.build-frontend.result == 'success'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Mock Launching Test EC2
+        run: |
+          echo "🚀 Launching Test EC2 because at least one build was successful!"
 
   # mock-qa-promotion:
   #   name: Promote Nightly Build to QA
