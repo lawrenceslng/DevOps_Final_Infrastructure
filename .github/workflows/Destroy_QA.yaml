@@ -94,7 +94,7 @@ jobs:
                 "Name": "qa.codingwithboba.com",
                 "Type": "CNAME",
                 "TTL": 60,
-                "ResourceRecords": [{ "Value": ${{ steps.alb.outputs.alb_dns }} }]
+                "ResourceRecords": [{ "Value": "dummy-placeholder" }]
               }
             }]
           }
@@ -103,7 +103,9 @@ jobs:
           CURRENT_ALB_DNS=${{ steps.alb.outputs.alb_dns }}
 
           if [[ -n "$CURRENT_ALB_DNS" ]]; then
-            sed -i "s/dummy-placeholder/$CURRENT_ALB_DNS/" change-batch.json
+            sed -i "s|dummy-placeholder|$CURRENT_ALB_DNS|" change-batch.json
+
+            cat change-batch.json
 
             aws route53 change-resource-record-sets \
               --hosted-zone-id "${{ secrets.AWS_HOSTED_ZONE_ID }}" \
