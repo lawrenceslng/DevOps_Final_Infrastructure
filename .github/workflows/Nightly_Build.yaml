@@ -17,62 +17,145 @@ jobs:
       frontend_changed: ${{ steps.set_outputs.outputs.frontend_changed }}
 
     steps:
-      # Need to fix the artifact retrieval as it's not working
-      # - name: Download last SHAs (if exists)
-      #   uses: actions/download-artifact@v4
-      #   with:
-      #     name: last-nightly-shas
-      #     path: old-shas
-      #   continue-on-error: true
-
       - name: Checkout Infrastructure Repository
         uses: actions/checkout@v4
         with:
           path: Infra
+          token: ${{ secrets.INFRA_REPO_PAT }}
 
-      - name: Load Previous SHAs (if file exists)
-        id: load_shas
-        run: |
-          if [ -f Infra/LATEST_SHAS.txt ]; then
-            echo "Loading LATEST_SHAS.txt..."
-            cat Infra/LATEST_SHAS.txt
-            source Infra/LATEST_SHAS.txt
-          else
-            echo "LATEST_SHAS.txt not found, assuming fresh run."
-          fi
+      # - name: Load Previous SHAs (if file exists)
+      #   id: load_shas
+      #   run: |
+      #     if [ -f Infra/LATEST_SHAS.txt ]; then
+      #       echo "Loading LATEST_SHAS.txt..."
+      #       cat Infra/LATEST_SHAS.txt
+      #       source Infra/LATEST_SHAS.txt
+      #     else
+      #       echo "LATEST_SHAS.txt not found, assuming fresh run."
+      #     fi
 
       - name: Checkout Cart Service Repository
         uses: actions/checkout@v4
         with:
           repository: lawrenceslng/DevOps_Final_Cart_Service
           path: Cart
+          ref: main
+          token: ${{ secrets.INFRA_REPO_PAT }}
 
       - name: Checkout Product Service Repository
         uses: actions/checkout@v4
         with:
           repository: lawrenceslng/DevOps_Final_Product_Service
           path: Product
+          ref: main
+          token: ${{ secrets.INFRA_REPO_PAT }}
 
       - name: Checkout Order Service Repository
         uses: actions/checkout@v4
         with:
           repository: lawrenceslng/DevOps_Final_Order_Service
           path: Order
+          ref: main
+          token: ${{ secrets.INFRA_REPO_PAT }}
 
       - name: Checkout Frontend Repository
         uses: actions/checkout@v4
         with:
           repository: lawrenceslng/DevOps_Final_Frontend
           path: Frontend
+          ref: main
+          token: ${{ secrets.INFRA_REPO_PAT }}
 
+      # - name: Compare SHAs
+      #   id: set_outputs
+      #   run: |
+      #     chmod +x ./Infra/.github/scripts/check-shas.sh
+      #     ./Infra/.github/scripts/check-shas.sh
+      #     cat result.env >> $GITHUB_OUTPUT
+  
       - name: Compare SHAs
         id: set_outputs
         run: |
-          chmod +x ./Infra/.github/scripts/check-shas.sh
-          ./Infra/.github/scripts/check-shas.sh
-          cat result.env >> $GITHUB_OUTPUT
-  
-      - name: Commit & Push Updated SHAs
+          # Load stored SHAs
+          CART_SHA_STORED=$(jq -r '.["cart-service"].last_commit' Infra/services.json)
+          PRODUCT_SHA_STORED=$(jq -r '.["product-service"].last_commit' Infra/services.json)
+          ORDER_SHA_STORED=$(jq -r '.["order-service"].last_commit' Infra/services.json)
+          FRONTEND_SHA_STORED=$(jq -r '.["frontend"].last_commit' Infra/services.json)
+
+          # Get current SHAs
+          CART_SHA_CURRENT=$(cd Cart && git rev-parse HEAD)
+          PRODUCT_SHA_CURRENT=$(cd Product && git rev-parse HEAD)
+          ORDER_SHA_CURRENT=$(cd Order && git rev-parse HEAD)
+          FRONTEND_SHA_CURRENT=$(cd Frontend && git rev-parse HEAD)
+
+          # Compare
+          echo "cart_changed=$([ "$CART_SHA_CURRENT" != "$CART_SHA_STORED" ] && echo true || echo false)" >> $GITHUB_OUTPUT
+          echo "product_changed=$([ "$PRODUCT_SHA_CURRENT" != "$PRODUCT_SHA_STORED" ] && echo true || echo false)" >> $GITHUB_OUTPUT
+          echo "order_changed=$([ "$ORDER_SHA_CURRENT" != "$ORDER_SHA_STORED" ] && echo true || echo false)" >> $GITHUB_OUTPUT
+          echo "frontend_changed=$([ "$FRONTEND_SHA_CURRENT" != "$FRONTEND_SHA_STORED" ] && echo true || echo false)" >> $GITHUB_OUTPUT
+
+          # Save new SHAs for later commit if changed
+          echo "CART_SHA_CURRENT=$CART_SHA_CURRENT" >> $GITHUB_ENV
+          echo "PRODUCT_SHA_CURRENT=$PRODUCT_SHA_CURRENT" >> $GITHUB_ENV
+          echo "ORDER_SHA_CURRENT=$ORDER_SHA_CURRENT" >> $GITHUB_ENV
+          echo "FRONTEND_SHA_CURRENT=$FRONTEND_SHA_CURRENT" >> $GITHUB_ENV
+
+      # - name: Commit & Push Updated SHAs
+      #   if: steps.set_outputs.outputs.cart_changed == 'true' || steps.set_outputs.outputs.product_changed == 'true' || steps.set_outputs.outputs.order_changed == 'true' || steps.set_outputs.outputs.frontend_changed == 'true'
+      #   run: |
+      #     cd Infra
+
+      #     git config user.name "github-actions"
+      #     git config user.email "github-actions@github.com"
+
+      #     git add LATEST_SHAS.txt
+
+      #     # Only commit if there's actually a change
+      #     if ! git diff --cached --quiet; then
+      #       echo "✅ Committing updated LATEST_SHAS.txt..."
+      #       git commit -m "Update LATEST_SHAS.txt from nightly build"
+
+      #       # Set GitHub token-based URL
+      #       git remote set-url origin https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/lawrenceslng/DevOps_Final_Infrastructure.git
+
+      #       git push origin HEAD
+      #     else
+      #       echo "⚠️ No changes to commit in LATEST_SHAS.txt"
+      #     fi
+
+      - name: Update services.json with new SHAs
+        if: steps.set_outputs.outputs.cart_changed == 'true' || steps.set_outputs.outputs.product_changed == 'true' || steps.set_outputs.outputs.order_changed == 'true' || steps.set_outputs.outputs.frontend_changed == 'true'
+        run: |
+          cd Infra
+
+          NOW=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
+
+          # Update services.json for each service if changed
+          if [ "${{ steps.set_outputs.outputs.cart_changed }}" == "true" ]; then
+            jq --arg sha "$CART_SHA_CURRENT" --arg now "$NOW" \
+              '.["cart-service"].last_commit = $sha | .["cart-service"].last_build = $now' \
+              services.json > tmp.json && mv tmp.json services.json
+          fi
+
+          if [ "${{ steps.set_outputs.outputs.product_changed }}" == "true" ]; then
+            jq --arg sha "$PRODUCT_SHA_CURRENT" --arg now "$NOW" \
+              '.["product-service"].last_commit = $sha | .["product-service"].last_build = $now' \
+              services.json > tmp.json && mv tmp.json services.json
+          fi
+
+          if [ "${{ steps.set_outputs.outputs.order_changed }}" == "true" ]; then
+            jq --arg sha "$ORDER_SHA_CURRENT" --arg now "$NOW" \
+              '.["order-service"].last_commit = $sha | .["order-service"].last_build = $now' \
+              services.json > tmp.json && mv tmp.json services.json
+          fi
+
+          if [ "${{ steps.set_outputs.outputs.frontend_changed }}" == "true" ]; then
+            jq --arg sha "$FRONTEND_SHA_CURRENT" --arg now "$NOW" \
+              '.["frontend"].last_commit = $sha | .["frontend"].last_build = $now' \
+              services.json > tmp.json && mv tmp.json services.json
+          fi
+
+      - name: Commit & Push Updated services.json
         if: steps.set_outputs.outputs.cart_changed == 'true' || steps.set_outputs.outputs.product_changed == 'true' || steps.set_outputs.outputs.order_changed == 'true' || steps.set_outputs.outputs.frontend_changed == 'true'
         run: |
           cd Infra
@@ -80,185 +163,226 @@ jobs:
           git config user.name "github-actions"
           git config user.email "github-actions@github.com"
 
-          git add LATEST_SHAS.txt
-
-          # Only commit if there's actually a change
+          git add services.json
           if ! git diff --cached --quiet; then
-            echo "✅ Committing updated LATEST_SHAS.txt..."
-            git commit -m "Update LATEST_SHAS.txt from nightly build"
-
-            # Set GitHub token-based URL
+            git commit -m "Update services.json after nightly build"
             git remote set-url origin https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/lawrenceslng/DevOps_Final_Infrastructure.git
-
             git push origin HEAD
           else
-            echo "⚠️ No changes to commit in LATEST_SHAS.txt"
+            echo "⚠️ No changes to commit in services.json"
           fi
 
-      # - name: Upload New SHAs
-      #   if: steps.set_outputs.outputs.cart_changed == 'true' || steps.set_outputs.outputs.product_changed == 'true' || steps.set_outputs.outputs.order_changed == 'true' || steps.set_outputs.outputs.frontend_changed == 'true'
-      #   uses: actions/upload-artifact@v4
-      #   with:
-      #     name: last-nightly-shas
-      #     path: new-shas/
-
-  build-cart:
-    name: Build & Push Cart Image
-    needs: check-for-changes
-    if: needs.check-for-changes.outputs.cart_changed == 'true'
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout Cart Repo
-        uses: actions/checkout@v4
-        with:
-          repository: lawrenceslng/DevOps_Final_Cart_Service
-          path: Cart
-
-      - name: Configure AWS Credentials
-        uses: aws-actions/configure-aws-credentials@v4
-        with:
-          aws-region: ${{ secrets.AWS_ACCOUNT_REGION }}
-          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          aws-session-token: ${{ secrets.AWS_SESSION_TOKEN }}
-
-      - name: Login to Amazon ECR
-        id: login-ecr
-        uses: aws-actions/amazon-ecr-login@v2
-
-      - name: Build and Push Docker Image
+      - name: Mock Launching EC2 for Testing
+        id: launch-ec2
+        if: steps.set_outputs.outputs.cart_changed == 'true' || steps.set_outputs.outputs.product_changed == 'true' || steps.set_outputs.outputs.order_changed == 'true' || steps.set_outputs.outputs.frontend_changed == 'true'
         run: |
-          IMAGE_TAG=nightly-$(date +%Y%m%d%H%M%S)
-          REPO_URI=${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ secrets.AWS_ACCOUNT_REGION }}.amazonaws.com/cart-service
-          IMAGE_URI=$REPO_URI:$IMAGE_TAG
+          echo "We can launch an EC2 for testing the nightly build"
 
-          # Build the image
-          docker build -t $IMAGE_URI ./Cart
+  # build-cart:
+  #   name: Build & Push Cart Image
+  #   needs: check-for-changes
+  #   if: needs.check-for-changes.outputs.cart_changed == 'true'
+  #   runs-on: ubuntu-latest
+  #   steps:
+  #     - name: Checkout Cart Repo
+  #       uses: actions/checkout@v4
+  #       with:
+  #         repository: lawrenceslng/DevOps_Final_Cart_Service
+  #         path: Cart
 
-          # Tag as nightly-latest
-          docker tag $IMAGE_URI $REPO_URI:nightly-latest
+  #     - name: Configure AWS Credentials
+  #       uses: aws-actions/configure-aws-credentials@v4
+  #       with:
+  #         aws-region: ${{ secrets.AWS_ACCOUNT_REGION }}
+  #         aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+  #         aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+  #         aws-session-token: ${{ secrets.AWS_SESSION_TOKEN }}
 
-          # Push both tags
-          docker push $IMAGE_URI
-          docker push $REPO_URI:nightly-latest
+  #     - name: Login to Amazon ECR
+  #       id: login-ecr
+  #       uses: aws-actions/amazon-ecr-login@v2
 
-  build-product:
-    name: Build & Push Product Image
-    needs: check-for-changes
-    if: needs.check-for-changes.outputs.product_changed == 'true'
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout Product Repo
-        uses: actions/checkout@v4
-        with:
-          repository: lawrenceslng/DevOps_Final_Product_Service
-          path: Product
+  #     - name: Build and Push Docker Image
+  #       run: |
+  #         IMAGE_TAG=nightly-$(date +%Y%m%d%H%M%S)
+  #         REPO_URI=${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ secrets.AWS_ACCOUNT_REGION }}.amazonaws.com/cart-service
+  #         IMAGE_URI=$REPO_URI:$IMAGE_TAG
 
-      - name: Configure AWS Credentials
-        uses: aws-actions/configure-aws-credentials@v4
-        with:
-          aws-region: ${{ secrets.AWS_ACCOUNT_REGION }}
-          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          aws-session-token: ${{ secrets.AWS_SESSION_TOKEN }}
+  #         # Build the image
+  #         docker build -t $IMAGE_URI ./Cart
 
-      - name: Login to Amazon ECR
-        id: login-ecr
-        uses: aws-actions/amazon-ecr-login@v2
+  #         # Tag as nightly-latest
+  #         docker tag $IMAGE_URI $REPO_URI:nightly-latest
 
-      - name: Build and Push Docker Image
-        run: |
-          IMAGE_TAG=nightly-$(date +%Y%m%d%H%M%S)
-                    REPO_URI=${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ secrets.AWS_ACCOUNT_REGION }}.amazonaws.com/product-service
-          IMAGE_URI=$REPO_URI:$IMAGE_TAG
+  #         # Push both tags
+  #         docker push $IMAGE_URI
+  #         docker push $REPO_URI:nightly-latest
 
-          # Build the image
-          docker build -t $IMAGE_URI ./Product
+  # build-product:
+  #   name: Build & Push Product Image
+  #   needs: check-for-changes
+  #   if: needs.check-for-changes.outputs.product_changed == 'true'
+  #   runs-on: ubuntu-latest
+  #   steps:
+  #     - name: Checkout Product Repo
+  #       uses: actions/checkout@v4
+  #       with:
+  #         repository: lawrenceslng/DevOps_Final_Product_Service
+  #         path: Product
 
-          # Tag as nightly-latest
-          docker tag $IMAGE_URI $REPO_URI:nightly-latest
+  #     - name: Configure AWS Credentials
+  #       uses: aws-actions/configure-aws-credentials@v4
+  #       with:
+  #         aws-region: ${{ secrets.AWS_ACCOUNT_REGION }}
+  #         aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+  #         aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+  #         aws-session-token: ${{ secrets.AWS_SESSION_TOKEN }}
 
-          # Push both tags
-          docker push $IMAGE_URI
-          docker push $REPO_URI:nightly-latest
+  #     - name: Login to Amazon ECR
+  #       id: login-ecr
+  #       uses: aws-actions/amazon-ecr-login@v2
 
-  build-order:
-    name: Build & Push Order Image
-    needs: check-for-changes
-    if: needs.check-for-changes.outputs.order_changed == 'true'
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout Order Repo
-        uses: actions/checkout@v4
-        with:
-          repository: lawrenceslng/DevOps_Final_Order_Service
-          path: Order
+  #     - name: Build and Push Docker Image
+  #       run: |
+  #         IMAGE_TAG=nightly-$(date +%Y%m%d%H%M%S)
+  #                   REPO_URI=${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ secrets.AWS_ACCOUNT_REGION }}.amazonaws.com/product-service
+  #         IMAGE_URI=$REPO_URI:$IMAGE_TAG
 
-      - name: Configure AWS Credentials
-        uses: aws-actions/configure-aws-credentials@v4
-        with:
-          aws-region: ${{ secrets.AWS_ACCOUNT_REGION }}
-          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          aws-session-token: ${{ secrets.AWS_SESSION_TOKEN }}
+  #         # Build the image
+  #         docker build -t $IMAGE_URI ./Product
 
-      - name: Login to Amazon ECR
-        id: login-ecr
-        uses: aws-actions/amazon-ecr-login@v2
+  #         # Tag as nightly-latest
+  #         docker tag $IMAGE_URI $REPO_URI:nightly-latest
 
-      - name: Build and Push Docker Image
-        run: |
-          IMAGE_TAG=nightly-$(date +%Y%m%d%H%M%S)
-          REPO_URI=${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ secrets.AWS_ACCOUNT_REGION }}.amazonaws.com/order-service
-          IMAGE_URI=$REPO_URI:$IMAGE_TAG
+  #         # Push both tags
+  #         docker push $IMAGE_URI
+  #         docker push $REPO_URI:nightly-latest
 
-          # Build the image
-          docker build -t $IMAGE_URI ./Order
+  # build-order:
+  #   name: Build & Push Order Image
+  #   needs: check-for-changes
+  #   if: needs.check-for-changes.outputs.order_changed == 'true'
+  #   runs-on: ubuntu-latest
+  #   steps:
+  #     - name: Checkout Order Repo
+  #       uses: actions/checkout@v4
+  #       with:
+  #         repository: lawrenceslng/DevOps_Final_Order_Service
+  #         path: Order
 
-          # Tag as nightly-latest
-          docker tag $IMAGE_URI $REPO_URI:nightly-latest
+  #     - name: Configure AWS Credentials
+  #       uses: aws-actions/configure-aws-credentials@v4
+  #       with:
+  #         aws-region: ${{ secrets.AWS_ACCOUNT_REGION }}
+  #         aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+  #         aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+  #         aws-session-token: ${{ secrets.AWS_SESSION_TOKEN }}
 
-          # Push both tags
-          docker push $IMAGE_URI
-          docker push $REPO_URI:nightly-latest
+  #     - name: Login to Amazon ECR
+  #       id: login-ecr
+  #       uses: aws-actions/amazon-ecr-login@v2
 
-  build-frontend:
-    name: Build & Push Frontend Image
-    needs: check-for-changes
-    if: needs.check-for-changes.outputs.frontend_changed == 'true'
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout Frontend Repo
-        uses: actions/checkout@v4
-        with:
-          repository: lawrenceslng/DevOps_Final_Frontend
-          path: Frontend
+  #     - name: Build and Push Docker Image
+  #       run: |
+  #         IMAGE_TAG=nightly-$(date +%Y%m%d%H%M%S)
+  #         REPO_URI=${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ secrets.AWS_ACCOUNT_REGION }}.amazonaws.com/order-service
+  #         IMAGE_URI=$REPO_URI:$IMAGE_TAG
 
-      - name: Configure AWS Credentials
-        uses: aws-actions/configure-aws-credentials@v4
-        with:
-          aws-region: ${{ secrets.AWS_ACCOUNT_REGION }}
-          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          aws-session-token: ${{ secrets.AWS_SESSION_TOKEN }}
+  #         # Build the image
+  #         docker build -t $IMAGE_URI ./Order
 
-      - name: Login to Amazon ECR
-        id: login-ecr
-        uses: aws-actions/amazon-ecr-login@v2
+  #         # Tag as nightly-latest
+  #         docker tag $IMAGE_URI $REPO_URI:nightly-latest
 
-      - name: Build and Push Docker Image
-        run: |
-          # cd Frontend && npm ci && npm run build
-          IMAGE_TAG=nightly-$(date +%Y%m%d%H%M%S)
-          REPO_URI=${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ secrets.AWS_ACCOUNT_REGION }}.amazonaws.com/frontend
-          IMAGE_URI=$REPO_URI:$IMAGE_TAG
+  #         # Push both tags
+  #         docker push $IMAGE_URI
+  #         docker push $REPO_URI:nightly-latest
 
-          # Build the image
-          docker build -t $IMAGE_URI --build-arg NODE_ENV=production ./Frontend
+  # build-frontend:
+  #   name: Build & Push Frontend Image
+  #   needs: check-for-changes
+  #   if: needs.check-for-changes.outputs.frontend_changed == 'true'
+  #   runs-on: ubuntu-latest
+  #   steps:
+  #     - name: Checkout Frontend Repo
+  #       uses: actions/checkout@v4
+  #       with:
+  #         repository: lawrenceslng/DevOps_Final_Frontend
+  #         path: Frontend
 
-          # Tag as nightly-latest
-          docker tag $IMAGE_URI $REPO_URI:nightly-latest
+  #     - name: Configure AWS Credentials
+  #       uses: aws-actions/configure-aws-credentials@v4
+  #       with:
+  #         aws-region: ${{ secrets.AWS_ACCOUNT_REGION }}
+  #         aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+  #         aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+  #         aws-session-token: ${{ secrets.AWS_SESSION_TOKEN }}
 
-          # Push both tags
-          docker push $IMAGE_URI
-          docker push $REPO_URI:nightly-latest
+  #     - name: Login to Amazon ECR
+  #       id: login-ecr
+  #       uses: aws-actions/amazon-ecr-login@v2
+
+  #     - name: Build and Push Docker Image
+  #       run: |
+  #         # cd Frontend && npm ci && npm run build
+  #         IMAGE_TAG=nightly-$(date +%Y%m%d%H%M%S)
+  #         REPO_URI=${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ secrets.AWS_ACCOUNT_REGION }}.amazonaws.com/frontend
+  #         IMAGE_URI=$REPO_URI:$IMAGE_TAG
+
+  #         # Build the image
+  #         docker build -t $IMAGE_URI --build-arg NODE_ENV=production ./Frontend
+
+  #         # Tag as nightly-latest
+  #         docker tag $IMAGE_URI $REPO_URI:nightly-latest
+
+  #         # Push both tags
+  #         docker push $IMAGE_URI
+  #         docker push $REPO_URI:nightly-latest
+
+  # mock-qa-promotion:
+  #   name: Promote Nightly Build to QA
+  #   needs: check-for-changes
+  #   if: needs.check-for-changes.outputs.frontend_changed == 'true' || needs.check-for-changes.outputs.cart_changed == 'true' || needs.check-for-changes.outputs.product_changed == 'true' || needs.check-for-changes.outputs.order_changed == 'true'
+  #   runs-on: ubuntu-latest
+  #   steps:
+  #     - name: Mock Test EC2 test completion
+  #       run: |
+  #         echo "We will pretend that the testing EC2 has completed the tests."
+
+  #     - name: Configure AWS Credentials
+  #       uses: aws-actions/configure-aws-credentials@v4
+  #       with:
+  #         aws-region: ${{ secrets.AWS_ACCOUNT_REGION }}
+  #         aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+  #         aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+  #         aws-session-token: ${{ secrets.AWS_SESSION_TOKEN }}
+
+  #     - name: Login to Amazon ECR
+  #       id: login-ecr
+  #       uses: aws-actions/amazon-ecr-login@v2
+
+  #     - name: Tag the nightly-latest image to QA-1
+  #       run: |
+  #           # depending on which image has changes, just tag that one
+  #           MANIFEST=$(aws ecr batch-get-image \
+  #             --repository-name "$REPO" \
+  #             --image-ids imageTag=$SOURCE_TAG \
+  #             --output text \
+  #             --query 'images[].imageManifest')
+            
+  #           aws ecr put-image \
+  #             --repository-name "$REPO" \
+  #             --image-tag $TARGET_TAG \
+  #             --image-manifest "$MANIFEST"
+            
+  #           echo "Retagged $REPO:$SOURCE_TAG -> $TARGET_TAG"
+
+  #     - name: Trigger the deployment to QA workflow
+  #       run: |
+  #           curl -L \
+  #             -X POST \
+  #             -H "Accept: application/vnd.github+json" \
+  #             -H "Authorization: Bearer ${GITHUB_TOKEN}" \
+  #             -H "X-GitHub-Api-Version: 2022-11-28" \
+  #             "https://api.github.com/repos/lawrenceslng/DevOps_Final_Infrastructure/actions/workflows/${workflow_id}/dispatches" \
+  #             -d '{"ref":"main"}'

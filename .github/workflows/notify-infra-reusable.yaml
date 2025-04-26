@@ -1,0 +1,42 @@
+name: Notify Infra (Reusable)
+
+on:
+  workflow_call:
+    inputs:
+      version_path:
+        required: false
+        type: string
+        default: VERSION
+
+jobs:
+  notify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Read VERSION file
+        id: read_version
+        run: |
+          VERSION=$(cat ${{ inputs.version_path }})
+          echo "version=$VERSION" >> $GITHUB_ENV
+
+      - name: Extract repo name
+        id: repo_name
+        run: |
+          echo "repo_name=${GITHUB_REPOSITORY##*/}" >> $GITHUB_ENV
+
+      - name: Dispatch event to Infra
+        run: |
+          curl -X POST \
+            -H "Accept: application/vnd.github+json" \
+            -H "Authorization: Bearer ${{ secrets.INFRA_REPO_PAT }}" \
+            https://api.github.com/repos/lawrenceslng/DevOps_Final_Infrastructure/dispatches \
+            -d '{
+              "event_type": "service-updated",
+              "client_payload": {
+                "service": "'"${{ env.repo_name }}"'",
+                "branch": "${{ github.ref_name }}",
+                "version": "'"${{ env.version }}"'",
+                "commit_sha": "${{ github.sha }}"
+              }
+            }'

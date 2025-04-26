@@ -6,3 +6,4 @@ labsuser.pem
 .env_var
 tf-outputs.json
 eks-args.env
+.env

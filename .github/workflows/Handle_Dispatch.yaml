@@ -1,0 +1,109 @@
+name: Handle Microservice Promotion
+
+on:
+  repository_dispatch:
+    types: [service-updated]
+
+jobs:
+  promote-service:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Print incoming service info
+        run: |
+          echo "Service: ${{ github.event.client_payload.service }}"
+          echo "Branch: ${{ github.event.client_payload.branch }}"
+          echo "Version: ${{ github.event.client_payload.version }}"
+          echo "Commit SHA: ${{ github.event.client_payload.commit_sha }}"
+
+      - name: Checkout the service repo
+        uses: actions/checkout@v4
+        with:
+          repository: lawrenceslng/${{ github.event.client_payload.service }}
+          path: Service
+          ref: ${{ github.event.client_payload.branch }}
+          token: ${{ secrets.INFRA_REPO_PAT }}
+
+      - name: Checkout Infra repo
+        uses: actions/checkout@v4
+        with:
+          path: Infra
+          token: ${{ secrets.INFRA_REPO_PAT }}
+
+      - name: Compare versions and trigger deployment
+        id: compare-versions
+        run: |
+          SERVICE="${{ github.event.client_payload.service }}"
+          NEW_VERSION="${{ github.event.client_payload.version }}"
+          COMMIT_SHA="${{ github.event.client_payload.commit_sha }}"
+
+          echo "Loaded service: $SERVICE"
+          echo "Incoming VERSION: $NEW_VERSION"
+
+          # Load stored version
+          STORED_VERSION=$(jq -r ".\"$SERVICE\".latest_version" Infra/services.json)
+          echo "Stored VERSION: $STORED_VERSION"
+
+          # Default to no change
+          echo "changed=false" >> $GITHUB_ENV
+
+          if [ "$NEW_VERSION" = "$STORED_VERSION" ]; then
+            echo "✅ Versions match, no action needed."
+            exit 0
+          fi
+
+          # Versions are different → deploy needed
+          echo "changed=true" >> $GITHUB_ENV
+
+          # Decide what kind of deployment to trigger
+          if [[ "$NEW_VERSION" == *-rc* && "$STORED_VERSION" == *-qa ]]; then
+            echo "🚀 New RC detected after QA: triggering Deploy to UAT!"
+            # TODO: Trigger deploy to UAT
+            curl -X POST -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
+              https://api.github.com/repos/your-org/infra-repo/actions/workflows/Destroy_QA.yml/dispatches \
+              -d '{"ref":"main","inputs":{"service":"'$SERVICE'","version":"'$NEW_VERSION'"}}'
+
+            curl -X POST -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
+              https://api.github.com/repos/your-org/infra-repo/actions/workflows/Deploy_to_UAT.yml/dispatches \
+              -d '{"ref":"main","inputs":{"service":"'$SERVICE'","version":"'$NEW_VERSION'"}}'
+
+          elif [[ "$NEW_VERSION" == *-green && "$STORED_VERSION" == *-rc* ]]; then
+            echo "🚀 Green version detected after RC: triggering Green Deploy to Prod!"
+            # TODO: Trigger Green Deploy
+          elif [[ "$NEW_VERSION" == *-stable ]]; then
+            echo "🚀 Stable version detected: triggering Blue Deploy to Prod!"
+            # TODO: Trigger Blue Deploy
+          else
+            echo "⚠️ No matching promotion logic found for these versions."
+            exit 1
+          fi
+
+          # Update Infra/services.json with the new version and commit
+          NOW=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
+
+          jq --arg svc "$SERVICE" \
+             --arg ver "$NEW_VERSION" \
+             --arg sha "$COMMIT_SHA" \
+             --arg now "$NOW" \
+             '.[$svc].latest_version = $ver | .[$svc].last_commit = $sha | .[$svc].last_deploy = $now' \
+             Infra/services.json > Infra/services.tmp.json
+
+          mv Infra/services.tmp.json Infra/services.json
+
+      - name: Commit updated services.json
+        if: env.changed == 'true'
+        run: |
+          cd Infra
+
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+          git add services.json
+
+          if ! git diff --cached --quiet; then
+            git commit -m "Update services.json after promotion of ${{ github.event.client_payload.service }}"
+            git remote set-url origin https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/your-org/infra-repo.git
+            git push origin HEAD
+          else
+            echo "⚠️ No changes to commit in services.json"
+          fi

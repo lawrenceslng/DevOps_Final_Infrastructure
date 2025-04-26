@@ -1,0 +1,23 @@
+{
+    "cart-service": {
+      "latest_version": "0.0.9",
+      "last_commit": "abc123def",
+      "last_deploy": "2025-04-26T03:21:00Z"
+    },
+    "frontend": {
+      "latest_version": "0.0.9",
+      "last_commit": "def456abc",
+      "last_deploy": "2025-04-25T19:08:00Z"
+    },
+    "order-service": {
+        "latest_version": "0.0.9",
+        "last_commit": "abc123def",
+        "last_deploy": "2025-04-26T03:21:00Z"
+    },
+    "product-service": {
+        "latest_version": "0.0.9",
+        "last_commit": "def456abc",
+        "last_deploy": "2025-04-25T19:08:00Z"
+    }
+}
+  
