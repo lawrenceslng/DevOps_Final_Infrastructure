@@ -1,26 +1,26 @@
 {
-    "cart-service": {
-      "latest_version": "1.0.0",
-      "last_commit": "d10c3567bede9a18a15a04f831de643c0a487665",
-      "last_deploy": "2025-04-26T03:21:00Z",
-      "last_build": "2025-04-26T20:47:23Z"
-    },
-    "frontend": {
-      "latest_version": "1.0.0",
-      "last_commit": "5a8f475c4342c90306f737c67000da7166201fd3",
-      "last_deploy": "2025-04-25T19:08:00Z",
-      "last_build": "2025-04-26T20:47:23Z"
-    },
-    "order-service": {
-      "latest_version": "1.0.0",
-      "last_commit": "e67a59abfd0a959eeff6d1b1270b5ada23ddc52c",
-      "last_deploy": "2025-04-26T03:21:00Z",
-      "last_build": "2025-04-26T20:47:23Z"
-    },
-    "product-service": {
-      "latest_version": "1.0.0",
-      "last_commit": "4f5f73e37b9bd8d319863cb54fb99891b8a7506f",
-      "last_deploy": "2025-04-25T19:08:00Z",
-      "last_build": "2025-04-26T20:47:23Z"
-    }
+  "cart-service": {
+    "latest_version": "1.0.0",
+    "last_commit": "bf62fd9f550c63528c17f24e4612f237cbc06c5c",
+    "last_deploy": "2025-04-26T03:21:00Z",
+    "last_build": "2025-04-27T09:13:53Z"
+  },
+  "frontend": {
+    "latest_version": "1.0.0",
+    "last_commit": "6017a3b0865552f6134f651b254fc4c07fa02875",
+    "last_deploy": "2025-04-25T19:08:00Z",
+    "last_build": "2025-04-27T09:13:53Z"
+  },
+  "order-service": {
+    "latest_version": "1.0.0",
+    "last_commit": "6397cff73354fe4c27ed71447066ff6fffb995a8",
+    "last_deploy": "2025-04-26T03:21:00Z",
+    "last_build": "2025-04-27T09:13:53Z"
+  },
+  "product-service": {
+    "latest_version": "1.0.0",
+    "last_commit": "e47b41cdd5f188075ad6bd04e46a125c996c4e46",
+    "last_deploy": "2025-04-25T19:08:00Z",
+    "last_build": "2025-04-27T09:13:53Z"
   }
+}
