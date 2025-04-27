@@ -1,0 +1,57 @@
+# frontend-service-nodeport.yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: frontend-service
+  namespace: uat
+spec:
+  selector:
+    app: frontend
+    version: blue
+  type: NodePort
+  ports:
+    - port: 80
+      targetPort: 80
+      nodePort: 30085  # <- IMPORTANT: exposes port 30080 on each Node
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: order-service
+  namespace: uat
+spec:
+  selector:
+    app: order
+    version: blue
+  ports:
+  - port: 3001
+    targetPort: 3001
+  type: ClusterIP
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: product-service
+  namespace: uat
+spec:
+  selector:
+    app: product
+    version: blue
+  ports:
+  - port: 3003
+    targetPort: 3003
+  type: ClusterIP
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: cart-service
+  namespace: uat
+spec:
+  selector:
+    app: cart
+    version: blue  # <<< starts pointing to blue version
+  ports:
+  - port: 3002
+    targetPort: 3002
+  type: ClusterIP

@@ -1,0 +1,207 @@
+name: Initial Image Build and Push to ECR
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build-cart:
+    name: Build & Push Cart Image
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Cart Repo
+        uses: actions/checkout@v4
+        with:
+          repository: lawrenceslng/DevOps_Final_Cart_Service
+          path: Cart
+          ref: main
+          token: ${{ secrets.INFRA_REPO_PAT }}
+
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-region: ${{ secrets.AWS_ACCOUNT_REGION }}
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-session-token: ${{ secrets.AWS_SESSION_TOKEN }}
+
+      - name: Login to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Build and Push Docker Image
+        run: |
+          set -e  # Fail fast on any error
+
+          IMAGE_TAG=nightly-$(date +%Y%m%d%H%M%S)
+          REPO_URI=${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ secrets.AWS_ACCOUNT_REGION }}.amazonaws.com/cart-service
+          IMAGE_URI=$REPO_URI:$IMAGE_TAG
+
+          echo "🔨 Building Docker image tagged $IMAGE_URI"
+          docker build -t $IMAGE_URI ./Cart
+
+          echo "🏷️ Tagging other variants..."
+          docker tag $IMAGE_URI $REPO_URI:nightly-latest
+          docker tag $IMAGE_URI $REPO_URI:1.0.0-rc-1
+          docker tag $IMAGE_URI $REPO_URI:1.0.0-green
+          docker tag $IMAGE_URI $REPO_URI:1.0.0-stable
+          docker tag $IMAGE_URI $REPO_URI:1.0.0
+
+          echo "🚀 Pushing images to ECR..."
+          docker push $IMAGE_URI
+          docker push $REPO_URI:nightly-latest
+          docker push $REPO_URI:1.0.0-rc-1
+          docker push $REPO_URI:1.0.0-green
+          docker push $REPO_URI:1.0.0-stable
+          docker push $REPO_URI:1.0.0
+
+  build-product:
+    name: Build & Push Product Image
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Product Repo
+        uses: actions/checkout@v4
+        with:
+          repository: lawrenceslng/DevOps_Final_Product_Service
+          path: Product
+          ref: main
+          token: ${{ secrets.INFRA_REPO_PAT }}
+
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-region: ${{ secrets.AWS_ACCOUNT_REGION }}
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-session-token: ${{ secrets.AWS_SESSION_TOKEN }}
+
+      - name: Login to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Build and Push Docker Image
+        run: |
+          set -e  # Fail fast on any error
+
+          IMAGE_TAG=nightly-$(date +%Y%m%d%H%M%S)
+          REPO_URI=${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ secrets.AWS_ACCOUNT_REGION }}.amazonaws.com/product-service
+          IMAGE_URI=$REPO_URI:$IMAGE_TAG
+
+          echo "🔨 Building Docker image tagged $IMAGE_URI"
+          docker build -t $IMAGE_URI ./Product
+
+          echo "🏷️ Tagging other variants..."
+          docker tag $IMAGE_URI $REPO_URI:nightly-latest
+          docker tag $IMAGE_URI $REPO_URI:1.0.0-rc-1
+          docker tag $IMAGE_URI $REPO_URI:1.0.0-green
+          docker tag $IMAGE_URI $REPO_URI:1.0.0-stable
+          docker tag $IMAGE_URI $REPO_URI:1.0.0
+
+          echo "🚀 Pushing images to ECR..."
+          docker push $IMAGE_URI
+          docker push $REPO_URI:nightly-latest
+          docker push $REPO_URI:1.0.0-rc-1
+          docker push $REPO_URI:1.0.0-green
+          docker push $REPO_URI:1.0.0-stable
+          docker push $REPO_URI:1.0.0
+
+
+  build-order:
+    name: Build & Push Order Image
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Order Repo
+        uses: actions/checkout@v4
+        with:
+          repository: lawrenceslng/DevOps_Final_Order_Service
+          path: Order
+          ref: main
+          token: ${{ secrets.INFRA_REPO_PAT }}
+
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-region: ${{ secrets.AWS_ACCOUNT_REGION }}
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-session-token: ${{ secrets.AWS_SESSION_TOKEN }}
+
+      - name: Login to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Build and Push Docker Image
+        run: |
+          set -e  # Fail fast on any error
+
+          IMAGE_TAG=nightly-$(date +%Y%m%d%H%M%S)
+          REPO_URI=${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ secrets.AWS_ACCOUNT_REGION }}.amazonaws.com/order-service
+          IMAGE_URI=$REPO_URI:$IMAGE_TAG
+
+          echo "🔨 Building Docker image tagged $IMAGE_URI"
+          docker build -t $IMAGE_URI ./Order
+
+          echo "🏷️ Tagging other variants..."
+          docker tag $IMAGE_URI $REPO_URI:nightly-latest
+          docker tag $IMAGE_URI $REPO_URI:1.0.0-rc-1
+          docker tag $IMAGE_URI $REPO_URI:1.0.0-green
+          docker tag $IMAGE_URI $REPO_URI:1.0.0-stable
+          docker tag $IMAGE_URI $REPO_URI:1.0.0
+
+          echo "🚀 Pushing images to ECR..."
+          docker push $IMAGE_URI
+          docker push $REPO_URI:nightly-latest
+          docker push $REPO_URI:1.0.0-rc-1
+          docker push $REPO_URI:1.0.0-green
+          docker push $REPO_URI:1.0.0-stable
+          docker push $REPO_URI:1.0.0
+
+
+  build-frontend:
+    name: Build & Push Frontend Image
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Frontend Repo
+        uses: actions/checkout@v4
+        with:
+          repository: lawrenceslng/DevOps_Final_Frontend
+          path: Frontend
+          ref: main
+          token: ${{ secrets.INFRA_REPO_PAT }}
+
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-region: ${{ secrets.AWS_ACCOUNT_REGION }}
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-session-token: ${{ secrets.AWS_SESSION_TOKEN }}
+
+      - name: Login to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Build and Push Docker Image
+        run: |
+          set -e  # Fail fast on any error
+
+          IMAGE_TAG=nightly-$(date +%Y%m%d%H%M%S)
+          REPO_URI=${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ secrets.AWS_ACCOUNT_REGION }}.amazonaws.com/frontend
+          IMAGE_URI=$REPO_URI:$IMAGE_TAG
+
+          # Build the image
+          docker build -t $IMAGE_URI --build-arg NODE_ENV=production ./Frontend
+
+          echo "🏷️ Tagging other variants..."
+          docker tag $IMAGE_URI $REPO_URI:nightly-latest
+          docker tag $IMAGE_URI $REPO_URI:1.0.0-rc-1
+          docker tag $IMAGE_URI $REPO_URI:1.0.0-green
+          docker tag $IMAGE_URI $REPO_URI:1.0.0-stable
+          docker tag $IMAGE_URI $REPO_URI:1.0.0
+
+          echo "🚀 Pushing images to ECR..."
+          docker push $IMAGE_URI
+          docker push $REPO_URI:nightly-latest
+          docker push $REPO_URI:1.0.0-rc-1
+          docker push $REPO_URI:1.0.0-green
+          docker push $REPO_URI:1.0.0-stable
+          docker push $REPO_URI:1.0.0
