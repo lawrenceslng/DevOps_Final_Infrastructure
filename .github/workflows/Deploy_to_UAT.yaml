@@ -304,13 +304,13 @@ jobs:
         run: |
           kubectl apply -f Infra/k8s/uat/service.yaml
 
-      - name: Deploy Deployments
-        run: |
-          kubectl apply -f processed_k8s/*-rendered.yaml
+      # - name: Deploy Deployments
+        # run: |
+          # kubectl apply -f processed_k8s/*-rendered.yaml
     
-      # - name: Deploy All Microservices
-      #   run: |
-      #     for YAML in processed_k8s/*.yaml; do
-      #       echo "Deploying $YAML..."
-      #       kubectl apply -f $YAML
-      #     done
+      - name: Deploy All Microservices
+        run: |
+          for YAML in processed_k8s/*-rendered.yaml; do
+            echo "Deploying $YAML..."
+            kubectl apply -f $YAML
+          done
