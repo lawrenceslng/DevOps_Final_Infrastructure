@@ -366,7 +366,11 @@ jobs:
       - build-product
       - build-order
       - build-frontend
-    if: needs.check-for-changes.outputs.cart_changed == 'true' || needs.check-for-changes.outputs.product_changed == 'true' || needs.check-for-changes.outputs.order_changed == 'true' || needs.check-for-changes.outputs.frontend_changed == 'true'
+    if: >
+      (needs.build-cart.result == 'success') ||
+      (needs.build-product.result == 'success') ||
+      (needs.build-order.result == 'success') ||
+      (needs.build-frontend.result == 'success')
     runs-on: ubuntu-latest
     steps:
       - name: Mock Launching Test EC2

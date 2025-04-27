@@ -63,7 +63,7 @@ sg-035a44499abd77d26 - eks-cluster-sg-eks-cluster-365256518 needs inbound rule f
 
 ## on every Lab Start
 
-1. run `/scripts/setup_env.sh`
+1. run `/scripts/01-setup_env.sh`
 2. download .pem file and place in Infra 
 
 ### base 64 key to Github secrets
@@ -75,6 +75,8 @@ AWS_ACCESS_KEY_ID
 AWS_SECRET_ACCESS_KEY
 AWS_SESSION_TOKEN
 SSH_PRIVATE_KEY
+
+4. change private ip addresses in uat and prod load balancer target groups
 
 currently:
 - able to do nightly build
