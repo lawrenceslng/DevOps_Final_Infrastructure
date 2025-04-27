@@ -56,21 +56,36 @@ jobs:
           echo "changed=true" >> $GITHUB_ENV
 
           # Decide what kind of deployment to trigger
-          if [[ "$NEW_VERSION" == *-rc* && "$STORED_VERSION" == *-qa ]]; then
+          if [[ "$NEW_VERSION" == *-rc* ]]; then
             echo "🚀 New RC detected after QA: triggering Deploy to UAT!"
             # TODO: Trigger deploy to UAT
-            curl -X POST -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
-              https://api.github.com/repos/your-org/infra-repo/actions/workflows/Destroy_QA.yml/dispatches \
-              -d '{"ref":"main","inputs":{"service":"'$SERVICE'","version":"'$NEW_VERSION'"}}'
 
-            curl -X POST -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
-              https://api.github.com/repos/your-org/infra-repo/actions/workflows/Deploy_to_UAT.yml/dispatches \
-              -d '{"ref":"main","inputs":{"service":"'$SERVICE'","version":"'$NEW_VERSION'"}}'
+            # Trigger Deploy to UAT workflow by repository_dispatch
+            # curl -X POST \
+            #   -H "Accept: application/vnd.github+json" \
+            #   -H "Authorization: Bearer ${{ secrets.INFRA_REPO_PAT }}" \
+            #   https://api.github.com/repos/lawrenceslng/DevOps_Final_Infrastructure/dispatches \
+            #   -d '{
+            #     "event_type": "uat-deploy",
+            #     "client_payload": {
+            #       "service": "'"$SERVICE"'",
+            #       "version": "'"$NEW_VERSION"'"
+            #     }
+            #   }'
 
-          elif [[ "$NEW_VERSION" == *-green && "$STORED_VERSION" == *-rc* ]]; then
+            # Trigger QA Destroy workflow by repository_dispatch
+            # curl -X POST \
+            #   -H "Accept: application/vnd.github+json" \
+            #   -H "Authorization: Bearer ${{ secrets.INFRA_REPO_PAT }}" \
+            #   https://api.github.com/repos/lawrenceslng/DevOps_Final_Infrastructure/dispatches \
+            #   -d '{
+            #     "event_type": "destroy-qa"
+            #   }'
+
+          elif [[ "$NEW_VERSION" == *-ga* && "$STORED_VERSION" == *-rc* ]]; then
             echo "🚀 Green version detected after RC: triggering Green Deploy to Prod!"
             # TODO: Trigger Green Deploy
-          elif [[ "$NEW_VERSION" == *-stable ]]; then
+          elif [[ "$NEW_VERSION" == *-stable && "$STORED_VERSION" == *-ga* ]]; then
             echo "🚀 Stable version detected: triggering Blue Deploy to Prod!"
             # TODO: Trigger Blue Deploy
           else
@@ -90,6 +105,24 @@ jobs:
 
           mv Infra/services.tmp.json Infra/services.json
 
+      # - name: Commit updated services.json
+      #   if: env.changed == 'true'
+      #   run: |
+      #     cd Infra
+
+      #     git config user.name "github-actions[bot]"
+      #     git config user.email "github-actions[bot]@users.noreply.github.com"
+
+      #     git add services.json
+
+      #     if ! git diff --cached --quiet; then
+      #       git commit -m "Update services.json after promotion of ${{ github.event.client_payload.service }}"
+      #       git remote set-url origin https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/your-org/infra-repo.git
+      #       git push origin HEAD
+      #     else
+      #       echo "⚠️ No changes to commit in services.json"
+      #     fi
+
       - name: Commit updated services.json
         if: env.changed == 'true'
         run: |
@@ -102,8 +135,18 @@ jobs:
 
           if ! git diff --cached --quiet; then
             git commit -m "Update services.json after promotion of ${{ github.event.client_payload.service }}"
-            git remote set-url origin https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/your-org/infra-repo.git
-            git push origin HEAD
+            git remote set-url origin https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/lawrenceslng/DevOps_Final_Infrastructure.git
+
+            # Try pushing, if fail then rebase and push again
+            for i in {1..3}; do
+              if git push origin HEAD; then
+                echo "✅ Successfully pushed services.json!"
+                break
+              else
+                echo "⚠️ Push failed, trying to rebase and retry ($i)..."
+                git pull --rebase origin main
+              fi
+            done
           else
             echo "⚠️ No changes to commit in services.json"
           fi
