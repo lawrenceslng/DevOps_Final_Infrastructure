@@ -7,9 +7,9 @@
   },
   "frontend": {
     "latest_version": "1.0.1",
-    "last_commit": "d820bac8e1ccc800cc35d0e487574e25e49be9ab",
+    "last_commit": "2c91927f1752c6a06bff94b767dd938100c9231e",
     "last_deploy": "2025-04-27T10:55:39Z",
-    "last_build": "2025-04-27T09:45:01Z"
+    "last_build": "2025-04-27T11:17:42Z"
   },
   "order-service": {
     "latest_version": "1.0.0",
