@@ -5,8 +5,9 @@ metadata:
   namespace: prod
 spec:
   selector:
-    app: product-service
+    app: product
     version: blue
   ports:
-    - port: 80
-      targetPort: 3003
+  - port: 3003
+    targetPort: 3003
+  type: ClusterIP

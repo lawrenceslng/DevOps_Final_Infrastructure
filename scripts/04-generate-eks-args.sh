@@ -23,7 +23,7 @@ source "$ENV_VAR_FILE"
 
 # Extract values
 PRIVATE_SUBNETS=$(jq -r '.private_subnets.value | join(",")' "$TF_OUTPUT_FILE")
-PRIVATE_SUBNETS_SPACE_SEPARATED=$(jq -r '.private_subnets.value | join(" ")' "$TF_OUTPUT_FILE")
+PRIVATE_SUBNETS_SPACE_SEPARATED=$(jq -r '.private_subnets.value | map("\"" + . + "\"") | join(" ")' "$TF_OUTPUT_FILE")
 PUBLIC_SUBNETS=$(jq -r '.public_subnets.value | join(",")' "$TF_OUTPUT_FILE")
 VPC_ID=$(jq -r '.vpc_id.value' "$TF_OUTPUT_FILE")
 VPC_CIDR=$(jq -r '.vpc_cidr_block.value' "$TF_OUTPUT_FILE")

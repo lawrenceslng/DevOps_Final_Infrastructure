@@ -5,8 +5,9 @@ metadata:
   namespace: prod
 spec:
   selector:
-    app: cart-service
-    version: blue
+    app: cart
+    version: blue  # <<< starts pointing to blue version
   ports:
-    - port: 80
-      targetPort: 3002
+  - port: 3002
+    targetPort: 3002
+  type: ClusterIP

@@ -67,6 +67,7 @@ jobs:
 
           # Default to no change
           echo "changed=false" >> $GITHUB_ENV
+          echo "shutdown_uat=false" >> $GITHUB_ENV
 
           if [ "$NEW_VERSION" = "$STORED_VERSION" ]; then
             echo "✅ Versions match, no action needed."
@@ -82,33 +83,75 @@ jobs:
             # TODO: Trigger deploy to UAT
 
             # Trigger Deploy to UAT workflow by repository_dispatch
-            # curl -X POST \
-            #   -H "Accept: application/vnd.github+json" \
-            #   -H "Authorization: Bearer ${{ secrets.INFRA_REPO_PAT }}" \
-            #   https://api.github.com/repos/lawrenceslng/DevOps_Final_Infrastructure/dispatches \
-            #   -d '{
-            #     "event_type": "uat-deploy",
-            #     "client_payload": {
-            #       "service": "'"$SERVICE"'",
-            #       "version": "'"$NEW_VERSION"'"
-            #     }
-            #   }'
+            curl -X POST \
+              -H "Accept: application/vnd.github+json" \
+              -H "Authorization: Bearer ${{ secrets.INFRA_REPO_PAT }}" \
+              https://api.github.com/repos/lawrenceslng/DevOps_Final_Infrastructure/dispatches \
+              -d '{
+                "event_type": "uat-deploy",
+                "client_payload": {
+                  "service": "'"$SERVICE"'",
+                  "version": "'"$NEW_VERSION"'"
+                }
+              }'
 
             # Trigger QA Destroy workflow by repository_dispatch
-            # curl -X POST \
-            #   -H "Accept: application/vnd.github+json" \
-            #   -H "Authorization: Bearer ${{ secrets.INFRA_REPO_PAT }}" \
-            #   https://api.github.com/repos/lawrenceslng/DevOps_Final_Infrastructure/dispatches \
-            #   -d '{
-            #     "event_type": "destroy-qa"
-            #   }'
+            echo "🧹 Destroying QA resources..."
+            curl -X POST \
+              -H "Accept: application/vnd.github+json" \
+              -H "Authorization: Bearer ${{ secrets.INFRA_REPO_PAT }}" \
+              https://api.github.com/repos/lawrenceslng/DevOps_Final_Infrastructure/dispatches \
+              -d '{
+                "event_type": "destroy-qa"
+              }'
 
-          elif [[ "$NEW_VERSION" == *-ga* && "$STORED_VERSION" == *-rc* ]]; then
+          elif [[ "$NEW_VERSION" == *-green && "$STORED_VERSION" == *-rc* ]]; then
             echo "🚀 Green version detected after RC: triggering Green Deploy to Prod!"
             # TODO: Trigger Green Deploy
-          elif [[ "$NEW_VERSION" == *-stable && "$STORED_VERSION" == *-ga* ]]; then
-            echo "🚀 Stable version detected: triggering Blue Deploy to Prod!"
-            # TODO: Trigger Blue Deploy
+            
+            # Trigger Deploy to Green workflow by repository_dispatch
+            curl -X POST \
+              -H "Accept: application/vnd.github+json" \
+              -H "Authorization: Bearer ${{ secrets.INFRA_REPO_PAT }}" \
+              https://api.github.com/repos/lawrenceslng/DevOps_Final_Infrastructure/dispatches \
+              -d '{
+                "event_type": "switch-service-to-green",
+                "client_payload": {
+                  "service": "'"$SERVICE"'",
+                  "version": "'"$NEW_VERSION"'"
+                }
+              }'
+
+            echo "shutdown_uat=true" >> $GITHUB_ENV
+
+
+          elif [[ "$NEW_VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            NEW_BASE_VERSION="${BASH_REMATCH[1]}"
+
+            if [[ "$STORED_VERSION" =~ ^([0-9]+\.[0-9]+\.[0-9]+)-green$ ]]; then
+              STORED_BASE_VERSION="${BASH_REMATCH[1]}"
+
+              if [[ "$NEW_BASE_VERSION" == "$STORED_BASE_VERSION" ]]; then
+                echo "🚀 Stable version detected after Green: triggering Blue Deploy to Prod!"
+                # Trigger Blue Deploy
+
+                # Trigger Deploy to Green workflow by repository_dispatch
+                curl -X POST \
+                  -H "Accept: application/vnd.github+json" \
+                  -H "Authorization: Bearer ${{ secrets.INFRA_REPO_PAT }}" \
+                  https://api.github.com/repos/lawrenceslng/DevOps_Final_Infrastructure/dispatches \
+                  -d '{
+                    "event_type": "promote-green-to-blue",
+                    "client_payload": {
+                      "service": "'"$SERVICE"'",
+                      "version": "'"$NEW_VERSION"'"
+                    }
+                  }'
+
+              else
+                echo "❌ Version numbers do not match between NEW and STORED, no Blue Deploy!"
+                exit 1
+              fi
           else
             echo "⚠️ No matching promotion logic found for these versions."
             exit 1
@@ -171,3 +214,21 @@ jobs:
           else
             echo "⚠️ No changes to commit in services.json"
           fi
+
+      - name: Setup kubectl
+        if: env.shutdown_uat == 'true'
+        uses: azure/setup-kubectl@v4
+        with:
+          version: 'latest'
+
+      - name: Configure kubectl to EKS
+        if: env.shutdown_uat == 'true'
+        run: |
+          aws eks update-kubeconfig --region ${{ secrets.AWS_ACCOUNT_REGION }} --name ${{ secrets.AWS_EKS_CLUSTER_NAME }}
+
+      - name: Shut Down UAT Namespace
+        if: env.shutdown_uat == 'true'
+        run: |
+            echo "🧹 Shutting down UAT resources..."
+
+            kubectl delete namespace uat

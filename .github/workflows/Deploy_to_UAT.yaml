@@ -1,9 +1,18 @@
 name: Deploy to UAT
 
 on:
-  # schedule:
-  #   - cron: '0 * * * *'  # optional: hourly check
+  repository_dispatch:
+    types: [uat-deploy]
   workflow_dispatch:
+    inputs:
+      service:
+        description: 'Microservice to deploy (frontend, cart-service, product-service, order-service)'
+        required: true
+        type: string
+      version:
+        description: 'Version to promote (e.g., rc-1)'
+        required: true
+        type: string
 
 jobs:
   deploy-uat:
@@ -20,18 +29,18 @@ jobs:
           echo "REPOS=frontend cart-service order-service product-service" >> $GITHUB_ENV
           echo "ORG=lawrenceslng" >> $GITHUB_ENV
 
-      - name: Check for UAT tags
-        id: check-tags
-        run: |
-          updated=false
-          for repo in $REPOS; do
-            latest_tag=$(curl -s https://api.github.com/repos/${ORG}/DevOps_Final_${repo^}/tags | jq -r '.[].name' | grep '^uat-' | head -n 1)
-            if [[ $latest_tag != "" ]]; then
-              echo "📦 UAT tag found in $repo: $latest_tag"
-              updated=true
-            fi
-          done
-          echo "changed=$updated" >> $GITHUB_OUTPUT
+      # - name: Check for UAT tags
+      #   id: check-tags
+      #   run: |
+      #     updated=false
+      #     for repo in $REPOS; do
+      #       latest_tag=$(curl -s https://api.github.com/repos/${ORG}/DevOps_Final_${repo^}/tags | jq -r '.[].name' | grep '^uat-' | head -n 1)
+      #       if [[ $latest_tag != "" ]]; then
+      #         echo "📦 UAT tag found in $repo: $latest_tag"
+      #         updated=true
+      #       fi
+      #     done
+      #     echo "changed=$updated" >> $GITHUB_OUTPUT
 
       - name: Configure AWS Credentials
         uses: aws-actions/configure-aws-credentials@v4
@@ -41,22 +50,212 @@ jobs:
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-session-token: ${{ secrets.AWS_SESSION_TOKEN }}
 
-      - name: Set up kubectl
-        if: steps.check-tags.outputs.changed == 'true'
+      - name: Login to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Re-tag Nightly Build as RC-1
+        run: |
+          # Detect if triggered by repository_dispatch or manual workflow_dispatch
+          if [ -n "${{ github.event.client_payload.service }}" ]; then
+            SERVICE_NAME="${{ github.event.client_payload.service }}"
+            VERSION="${{ github.event.client_payload.version }}"
+          else
+            SERVICE_NAME="${{ github.event.inputs.service }}"
+            VERSION="${{ github.event.inputs.version }}"
+          fi
+
+          REPO_URI=${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ secrets.AWS_ACCOUNT_REGION }}.amazonaws.com/$SERVICE_NAME
+
+          echo "⏳ Pulling nightly-latest image for $SERVICE_NAME..."
+          docker pull $REPO_URI:nightly-latest
+
+          echo "🏷️ Re-tagging image as $VERSION..."
+          docker tag $REPO_URI:nightly-latest $REPO_URI:$VERSION
+
+          echo "🚀 Pushing RC-1 tag to ECR..."
+          docker push $REPO_URI:$VERSION
+
+
+      # - name: Set up kubectl
+      #   if: steps.check-tags.outputs.changed == 'true'
+      #   uses: azure/setup-kubectl@v4
+      #   with:
+      #     version: 'latest'
+
+      # - name: Update kubeconfig
+      #   if: steps.check-tags.outputs.changed == 'true'
+      #   run: aws eks update-kubeconfig --region ${{ secrets.AWS_ACCOUNT_REGION }} --name eks-cluster
+
+      # - name: Deploy to UAT namespace
+      #   if: steps.check-tags.outputs.changed == 'true'
+      #   run: |
+      #     kubectl apply -f k8s/uat/namespace.yaml || true
+      #     kubectl apply -f k8s/uat/env-config.yaml
+      #     kubectl apply -f k8s/uat/deployment.yaml
+      #     kubectl apply -f k8s/uat/services.yaml
+      #     # kubectl apply -f k8s/uat/ingress.yaml
+
+      # - name: Create Target Group
+      #   id: create-tg
+      #   run: |
+      #     TG_ARN=$(aws elbv2 create-target-group \
+      #       --name uat-ec2-tg \
+      #       --protocol HTTP --port 80 \
+      #       --vpc-id ${{ secrets.AWS_VPC_ID }} \
+      #       --target-type ip \
+      #       --health-check-protocol HTTP \
+      #       --health-check-path / \
+      #       --query 'TargetGroups[0].TargetGroupArn' \
+      #       --output text)
+
+      #     echo "tg_arn=$TG_ARN" >> $GITHUB_ENV
+
+      # - name: Create Application Load Balancer
+      #   id: create-alb
+      #   run: |
+      #     ALB_ARN=$(aws elbv2 create-load-balancer \
+      #       --name uat-alb \
+      #       --subnets ${{ secrets.AWS_PUBLIC_SUBNET_ID }} ${{ secrets.AWS_PUBLIC_SUBNET_ID_2 }} ${{ secrets.AWS_PUBLIC_SUBNET_ID_3 }} \
+      #       --security-groups ${{ secrets.AWS_UAT_SECURITY_GROUP_ID }} \
+      #       --scheme internet-facing \
+      #       --query 'LoadBalancers[0].LoadBalancerArn' \
+      #       --output text)
+
+      #     DNS=$(aws elbv2 describe-load-balancers \
+      #       --load-balancer-arns $ALB_ARN \
+      #       --query 'LoadBalancers[0].DNSName' --output text)
+
+      #     echo "alb_arn=$ALB_ARN" >> $GITHUB_ENV
+      #     echo "alb_dns=$DNS" >> $GITHUB_ENV
+
+      # - name: Create HTTP Listener
+      #   run: |
+      #     aws elbv2 create-listener \
+      #       --load-balancer-arn ${{ env.alb_arn }} \
+      #       --protocol HTTP \
+      #       --port 80 \
+      #       --default-actions Type=forward,TargetGroupArn=${{ env.tg_arn }}
+
+      # - name: Update Route53 Record for UAT
+      #   run: |
+      #     cat > change-batch.json <<EOF
+      #     {
+      #       "Comment": "Update UAT CNAME to point to ALB",
+      #       "Changes": [{
+      #         "Action": "UPSERT",
+      #         "ResourceRecordSet": {
+      #           "Name": "uat.codingwithboba.com",
+      #           "Type": "CNAME",
+      #           "TTL": 60,
+      #           "ResourceRecords": [{
+      #             "Value": "${{ env.alb_dns }}"
+      #           }]
+      #         }
+      #       }]
+      #     }
+      #     EOF
+
+      #     aws route53 change-resource-record-sets \
+      #       --hosted-zone-id ${{ secrets.AWS_HOSTED_ZONE_ID }} \
+      #       --change-batch file://change-batch.json
+
+      - name: Setup kubectl
         uses: azure/setup-kubectl@v4
         with:
           version: 'latest'
 
-      - name: Update kubeconfig
-        if: steps.check-tags.outputs.changed == 'true'
-        run: aws eks update-kubeconfig --region us-east-1 --name devops-final-cluster
-
-      - name: Deploy to UAT namespace
-        if: steps.check-tags.outputs.changed == 'true'
+      - name: Configure kubectl to EKS
         run: |
-          kubectl apply -f k8s/uat/namespace.yaml || true
-          kubectl apply -f k8s/uat/env-config.yaml
-          kubectl apply -f k8s/uat/deployment.yaml
-          kubectl apply -f k8s/uat/services.yaml
-          kubectl apply -f k8s/uat/ingress.yaml
+          aws eks update-kubeconfig --region ${{ secrets.AWS_ACCOUNT_REGION }} --name ${{ secrets.AWS_EKS_CLUSTER_NAME }}
 
+      - name: Prepare Deployment Files
+        run: |
+          if [ -n "${{ github.event.client_payload.service }}" ]; then
+            PROMOTED_SERVICE="${{ github.event.client_payload.service }}"
+            PROMOTED_VERSION="${{ github.event.client_payload.version }}"
+          else
+            PROMOTED_SERVICE="${{ github.event.inputs.service }}"
+            PROMOTED_VERSION="${{ github.event.inputs.version }}"
+          fi
+
+          mkdir processed_k8s
+          export AWS_ACCOUNT_ID=${{ secrets.AWS_ACCOUNT_ID }}
+          export AWS_REGION=${{ secrets.AWS_ACCOUNT_REGION }}
+          export REDIS_URL=${{ secrets.REDIS_URL }}
+          export DB_HOST=${{ secrets.DB_HOST }}
+          export DB_USER=${{ secrets.DB_USER }}
+          export DB_PASSWORD=${{ secrets.DB_PASSWORD }}
+
+          for SERVICE in cart-service frontend order-service product-service; do
+            echo "Processing $SERVICE..."
+
+            cp Infra/k8s/uat/${SERVICE}-deployment.yaml processed_k8s/$SERVICE.yaml
+
+            if [ "$SERVICE" == "$PROMOTED_SERVICE" ]; then
+              echo "Setting IMAGE_TAG to $PROMOTED_VERSION"
+              export IMAGE_TAG="$PROMOTED_VERSION"
+            else
+              echo "Setting IMAGE_TAG to nightly-latest"
+              export IMAGE_TAG="nightly-latest"
+            fi
+
+            envsubst < processed_k8s/$SERVICE.yaml > processed_k8s/${SERVICE}-rendered.yaml
+          done
+
+
+      # - name: Prepare Deployment Files
+      #   run: |
+      #     if [ -n "${{ github.event.client_payload.service }}" ]; then
+      #       PROMOTED_SERVICE="${{ github.event.client_payload.service }}"
+      #       PROMOTED_VERSION="${{ github.event.client_payload.version }}"
+      #     else
+      #       PROMOTED_SERVICE="${{ github.event.inputs.service }}"
+      #       PROMOTED_VERSION="${{ github.event.inputs.version }}"
+      #     fi
+
+      #     mkdir processed_k8s
+      #     AWS_ACCOUNT_ID=${{ secrets.AWS_ACCOUNT_ID }}
+      #     AWS_REGION=${{ secrets.AWS_ACCOUNT_REGION }}
+
+      #     for SERVICE in cart-service frontend order-service product-service; do
+      #       echo "Processing $SERVICE..."
+
+      #       cp Infra/k8s/uat/${SERVICE}-deployment.yaml processed_k8s/$SERVICE.yaml
+
+      #       sed -i "s|{{AWS_ACCOUNT_ID}}|$AWS_ACCOUNT_ID|g" processed_k8s/$SERVICE.yaml
+      #       sed -i "s|{{AWS_REGION}}|$AWS_REGION|g" processed_k8s/$SERVICE.yaml
+
+      #       if [ "$SERVICE" == "$PROMOTED_SERVICE" ]; then
+      #         IMAGE_TAG="$PROMOTED_VERSION"
+      #       else
+      #         IMAGE_TAG="nightly-latest"
+      #       fi
+
+      #       sed -i "s|{{IMAGE_TAG}}|$IMAGE_TAG|g" processed_k8s/$SERVICE.yaml
+
+      #       # Secrets patching (only if needed for that service)
+      #       sed -i "s|{{REDIS_URL}}|${{ secrets.REDIS_URL }}|g" processed_k8s/$SERVICE.yaml || true
+      #       sed -i "s|{{DB_HOST}}|${{ secrets.DB_HOST }}|g" processed_k8s/$SERVICE.yaml || true
+      #       sed -i "s|{{DB_USER}}|${{ secrets.DB_USER }}|g" processed_k8s/$SERVICE.yaml || true
+      #       sed -i "s|{{DB_PASSWORD}}|${{ secrets.DB_PASSWORD }}|g" processed_k8s/$SERVICE.yaml || true
+      #     done
+
+      - name: Deploy Namespace
+        run: |
+          kubectl apply -f Infra/k8s/uat/namespace.yaml
+
+      - name: Deploy Services
+        run: |
+          kubectl apply -f Infra/k8s/uat/service.yaml
+
+      - name: Deploy Deployments
+        run: |
+          kubectl apply -f processed_k8s/
+    
+      # - name: Deploy All Microservices
+      #   run: |
+      #     for YAML in processed_k8s/*.yaml; do
+      #       echo "Deploying $YAML..."
+      #       kubectl apply -f $YAML
+      #     done

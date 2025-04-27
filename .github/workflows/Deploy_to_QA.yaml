@@ -15,6 +15,11 @@ jobs:
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-session-token: ${{ secrets.AWS_SESSION_TOKEN }}
 
+      - name: Check if QA Environment exists
+        run: |
+          echo "If QA Environment already exists, we don't need to launch an EC2..."
+          echo "We will simply have new images in ECR and the current QA team will continue testing the previous 'nightly-latest' build and it's fine!"
+
       - name: Create QA EC2
         id: launch
         run: |
@@ -151,6 +156,15 @@ jobs:
             --load-balancer-arn ${{ steps.alb.outputs.alb_arn }} \
             --protocol HTTP \
             --port 80 \
+            --default-actions Type=forward,TargetGroupArn=${{ steps.tg.outputs.tg_arn }}
+
+      - name: Create HTTPS Listener for ALB
+        run: |
+          aws elbv2 create-listener \
+            --load-balancer-arn ${{ steps.alb.outputs.alb_arn }} \
+            --protocol HTTPS \
+            --port 443 \
+            --certificates CertificateArn=${{ secrets.AWS_QA_ACM_CERT_ARN }} \
             --default-actions Type=forward,TargetGroupArn=${{ steps.tg.outputs.tg_arn }}
 
       - name: Update Route 53 A Record for QA

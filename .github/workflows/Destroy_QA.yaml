@@ -1,6 +1,8 @@
 name: Destroy QA Environment
 
 on:
+  repository_dispatch:
+    types: [destroy-qa]
   workflow_dispatch:
 
 jobs:
@@ -64,12 +66,37 @@ jobs:
             --query "TargetGroups[0].TargetGroupArn" --output text)
           echo "tg_arn=$TG_ARN" >> "$GITHUB_OUTPUT"
 
-      - name: Find Listener and Delete It
+      # - name: Find Listener and Delete It
+      #   run: |
+      #     LISTENER_ARN=$(aws elbv2 describe-listeners \
+      #       --load-balancer-arn ${{ steps.alb.outputs.alb_arn }} \
+      #       --query "Listeners[0].ListenerArn" --output text)
+      #     aws elbv2 delete-listener --listener-arn $LISTENER_ARN
+
+      - name: Find and Delete All Listeners (HTTP and HTTPS)
         run: |
-          LISTENER_ARN=$(aws elbv2 describe-listeners \
+          LISTENERS=$(aws elbv2 describe-listeners \
             --load-balancer-arn ${{ steps.alb.outputs.alb_arn }} \
-            --query "Listeners[0].ListenerArn" --output text)
-          aws elbv2 delete-listener --listener-arn $LISTENER_ARN
+            --query "Listeners[].{Port:Port, Arn:ListenerArn}" \
+            --output json)
+
+          HTTP_LISTENER_ARN=$(echo "$LISTENERS" | jq -r '.[] | select(.Port == 80) | .Arn')
+          HTTPS_LISTENER_ARN=$(echo "$LISTENERS" | jq -r '.[] | select(.Port == 443) | .Arn')
+
+          if [ -n "$HTTP_LISTENER_ARN" ]; then
+            echo "🔴 Deleting HTTP Listener on port 80..."
+            aws elbv2 delete-listener --listener-arn "$HTTP_LISTENER_ARN"
+          else
+            echo "⚠️ No HTTP Listener found on port 80."
+          fi
+
+          if [ -n "$HTTPS_LISTENER_ARN" ]; then
+            echo "🔵 Deleting HTTPS Listener on port 443..."
+            aws elbv2 delete-listener --listener-arn "$HTTPS_LISTENER_ARN"
+          else
+            echo "⚠️ No HTTPS Listener found on port 443."
+          fi
+
 
       - name: Delete Load Balancer
         run: |

@@ -1,97 +1,118 @@
-# UAT Deployments and Services
-
-# Frontend Deployment (UAT)
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: frontend
+  name: cart-service-blue
   namespace: uat
 spec:
-  replicas: 1
+  replicas: 2
+  selector:
+    matchLabels:
+      app: cart
+      version: blue
+  template:
+    metadata:
+      labels:
+        app: cart
+        version: blue
+    spec:
+      containers:
+      - name: cart
+        image: 677005902461.dkr.ecr.us-east-1.amazonaws.com/cart-service:RC-1
+        ports:
+        - containerPort: 3002
+        env:
+        - name: REDIS_URL
+          value: "rediss://master.valkey.xs33rq.use1.cache.amazonaws.com:6379"
+        - name: PORT
+          value: "3002"
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: frontend-service-blue
+  namespace: uat
+spec:
+  replicas: 2
   selector:
     matchLabels:
       app: frontend
+      version: blue
   template:
     metadata:
       labels:
         app: frontend
+        version: blue
     spec:
       containers:
-        - name: frontend
-          image: <your-ecr-repo>/frontend:uat
-          ports:
-            - containerPort: 3000
-          volumeMounts:
-            - name: env-config
-              mountPath: /app/public/env-config.js
-              subPath: env-config.js
-      volumes:
-        - name: env-config
-          configMap:
-            name: env-config
+      - name: frontend
+        image: 677005902461.dkr.ecr.us-east-1.amazonaws.com/frontend:RC-1
+        ports:
+        - containerPort: 80
 ---
-# Cart Deployment (UAT)
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: cart-service
+  name: order-service-blue
   namespace: uat
 spec:
-  replicas: 1
+  replicas: 2
   selector:
     matchLabels:
-      app: cart-service
+      app: order
+      version: blue
   template:
     metadata:
       labels:
-        app: cart-service
+        app: order
+        version: blue
     spec:
       containers:
-        - name: cart
-          image: <your-ecr-repo>/cart-service:uat
-          ports:
-            - containerPort: 3002
+      - name: order
+        image: 677005902461.dkr.ecr.us-east-1.amazonaws.com/order-service:RC-1
+        ports:
+        - containerPort: 3001
+        env:
+        - name: DB_HOST
+          value: "terraform-20250425203328632300000001.c7etq1pbw4s4.us-east-1.rds.amazonaws.com"
+        - name: DB_USER
+          value: "root"
+        - name: DB_PASSWORD
+          value: "password"
+        - name: DB_NAME
+          value: "orderdb"
+        - name: PORT
+          value: "3001"
 ---
-# Order Deployment (UAT)
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: order-service
+  name: product-service-blue
   namespace: uat
 spec:
-  replicas: 1
+  replicas: 2
   selector:
     matchLabels:
-      app: order-service
+      app: product
+      version: blue
   template:
     metadata:
       labels:
-        app: order-service
+        app: product
+        version: blue
     spec:
       containers:
-        - name: order
-          image: <your-ecr-repo>/order-service:uat
-          ports:
-            - containerPort: 3001
----
-# Product Deployment (UAT)
-apiVersion: apps/v1
-kind: Deployment
-metadata:
-  name: product-service
-  namespace: uat
-spec:
-  replicas: 1
-  selector:
-    matchLabels:
-      app: product-service
-  template:
-    metadata:
-      labels:
-        app: product-service
-    spec:
-      containers:
-        - name: product
-          image: <your-ecr-repo>/product-service:uat
-          ports:
-            - containerPort: 3003
+      - name: product
+        image: 677005902461.dkr.ecr.us-east-1.amazonaws.com/product-service:RC-1
+        ports:
+        - containerPort: 3003
+        env:
+        - name: DB_HOST
+          value: "terraform-20250425203328632300000001.c7etq1pbw4s4.us-east-1.rds.amazonaws.com"
+        - name: DB_USER
+          value: "root"
+        - name: DB_PASSWORD
+          value: "password"
+        - name: DB_NAME
+          value: "productdb"
+        - name: PORT
+          value: "3003"
