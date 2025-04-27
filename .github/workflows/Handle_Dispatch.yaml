@@ -30,10 +30,31 @@ jobs:
           path: Infra
           token: ${{ secrets.INFRA_REPO_PAT }}
 
+      - name: Map repo name to service name
+        id: map-service
+        run: |
+          REPO_NAME="${{ github.event.client_payload.service }}"
+
+          # Default mapping logic
+          if [[ "$REPO_NAME" == "DevOps_Final_Frontend" ]]; then
+            SERVICE_NAME="frontend"
+          elif [[ "$REPO_NAME" == "DevOps_Final_Cart_Service" ]]; then
+            SERVICE_NAME="cart-service"
+          elif [[ "$REPO_NAME" == "DevOps_Final_Product_Service" ]]; then
+            SERVICE_NAME="product-service"
+          elif [[ "$REPO_NAME" == "DevOps_Final_Order_Service" ]]; then
+            SERVICE_NAME="order-service"
+          else
+            echo "❌ Unknown service repo: $REPO_NAME"
+            exit 1
+          fi
+
+          echo "service_name=$SERVICE_NAME" >> "$GITHUB_ENV"
+
       - name: Compare versions and trigger deployment
         id: compare-versions
         run: |
-          SERVICE="${{ github.event.client_payload.service }}"
+          SERVICE="${{ env.service_name }}"
           NEW_VERSION="${{ github.event.client_payload.version }}"
           COMMIT_SHA="${{ github.event.client_payload.commit_sha }}"
 
