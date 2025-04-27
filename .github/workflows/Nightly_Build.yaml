@@ -186,6 +186,7 @@ jobs:
     name: Build & Push Cart Image
     needs: check-for-changes
     if: needs.check-for-changes.outputs.cart_changed == 'true'
+    continue-on-error: true  # <--- ADD THIS LINE
     runs-on: ubuntu-latest
     steps:
       - name: Checkout Cart Repo
@@ -230,6 +231,7 @@ jobs:
     name: Build & Push Product Image
     needs: check-for-changes
     if: needs.check-for-changes.outputs.product_changed == 'true'
+    continue-on-error: true  # <--- ADD THIS LINE
     runs-on: ubuntu-latest
     steps:
       - name: Checkout Product Repo
@@ -274,6 +276,7 @@ jobs:
     name: Build & Push Order Image
     needs: check-for-changes
     if: needs.check-for-changes.outputs.order_changed == 'true'
+    continue-on-error: true  # <--- ADD THIS LINE
     runs-on: ubuntu-latest
     steps:
       - name: Checkout Order Repo
@@ -318,6 +321,7 @@ jobs:
     name: Build & Push Frontend Image
     needs: check-for-changes
     if: needs.check-for-changes.outputs.frontend_changed == 'true'
+    continue-on-error: true  # <--- ADD THIS LINE
     runs-on: ubuntu-latest
     steps:
       - name: Checkout Frontend Repo
