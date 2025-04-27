@@ -74,4 +74,4 @@ for REPO in "${MICROSERVICE_REPOS[@]}"; do
   promote_microservice "$REPO"
 done
 
-echo "🎉 All requested microservices have been bumped and promoted to Green Deployment!"
+echo "🎉 All requested microservices have been bumped and promoted to Blue Deployment!"

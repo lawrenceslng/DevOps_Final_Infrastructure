@@ -127,7 +127,7 @@ jobs:
             echo "shutdown_uat=true" >> $GITHUB_ENV
 
 
-          elif [[ "$NEW_VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+          elif [[ "$NEW_VERSION" =~ ^([0-9]+\.[0-9]+\.[0-9]+)$ ]]; then
             NEW_BASE_VERSION="${BASH_REMATCH[1]}"
 
             if [[ "$STORED_VERSION" =~ ^([0-9]+\.[0-9]+\.[0-9]+)-green$ ]]; then
