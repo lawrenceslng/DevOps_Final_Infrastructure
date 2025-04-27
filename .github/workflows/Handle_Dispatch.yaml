@@ -148,12 +148,12 @@ jobs:
                       "service": "'"$SERVICE"'",
                       "version": "'"$NEW_VERSION"'"
                     }
-                  }'
-
-              else
-                echo "❌ Version numbers do not match between NEW and STORED, no Blue Deploy!"
-                exit 1
-              fi
+                  }'         
+                else
+                  echo "❌ Version numbers do not match between NEW and STORED, no Blue Deploy!"
+                  exit 1
+                fi
+            fi
           else
             echo "⚠️ No matching promotion logic found for these versions."
             exit 1
