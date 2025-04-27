@@ -1,0 +1,190 @@
+name: Promote Green to New Blue
+
+on:
+  repository_dispatch:
+    types: [promote-green-to-blue]
+  workflow_dispatch:
+    inputs:
+      service_name:
+        description: 'Base service name (frontend, cart-service, etc.)'
+        required: true
+        type: string
+      version:
+        description: 'Image tag version to deploy (e.g., 1.0.0-green, 1.0.0-stable)'
+        required: true
+        type: string
+
+jobs:
+  promote-green:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Determine Service Name and VERSION
+        id: set-vars
+        run: |
+          if [ -n "${{ github.event.client_payload.service }}" ]; then
+            SERVICE_NAME="${{ github.event.client_payload.service }}"
+            VERSION="${{ github.event.client_payload.version }}"
+          else
+            SERVICE_NAME="${{ github.event.inputs.service_name }}"
+            VERSION="${{ github.event.inputs.version }}"
+          fi
+
+          echo "Service: $SERVICE_NAME"
+          echo "Version: $VERSION"
+
+          # Determine Namespace properly
+          NAMESPACE="prod"
+
+          echo "Target namespace: $NAMESPACE"
+
+          echo "service_name=$SERVICE_NAME" >> $GITHUB_OUTPUT
+          echo "namespace=$NAMESPACE" >> $GITHUB_OUTPUT
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+
+      - name: Checkout Infra Repo
+        uses: actions/checkout@v4
+
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-region: ${{ secrets.AWS_ACCOUNT_REGION }}
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-session-token: ${{ secrets.AWS_SESSION_TOKEN }}
+
+      - name: Login to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Re-tag Green Build as stable
+        run: |
+          SERVICE_NAME="${{ steps.set-vars.outputs.service_name }}"
+          NAMESPACE="${{ steps.set-vars.outputs.namespace }}"
+          VERSION="${{ steps.set-vars.outputs.version }}"
+
+          # Extract base version (remove '-green' suffix)
+          BASE_VERSION="${VERSION%-green}"
+
+          REPO_URI=${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ secrets.AWS_ACCOUNT_REGION }}.amazonaws.com/$SERVICE_NAME
+
+          GREEN_TAG="$BASE_VERSION-green"
+          STABLE_TAG="$BASE_VERSION-stable"
+          VERSION_TAG="$BASE_VERSION"
+
+          echo "📦 Repo: $REPO_URI"
+          echo "🔍 Retagging $GREEN_TAG ➔ $STABLE_TAG and $VERSION_TAG"
+
+          echo "⏳ Attempting to pull GREEN_TAG image: $GREEN_TAG"
+          if docker pull $REPO_URI:$GREEN_TAG; then
+            echo "✅ Successfully pulled Green image: $GREEN_TAG"
+          else
+            echo "❌ Failed to pull Green image: $GREEN_TAG"
+            echo "🚫 Cannot proceed with re-tagging."
+            exit 1
+          fi
+
+          echo "🏷️ Re-tagging image as $STABLE_TAG and $VERSION_TAG"
+          docker tag $REPO_URI:$GREEN_TAG $REPO_URI:$STABLE_TAG
+          docker tag $REPO_URI:$GREEN_TAG $REPO_URI:$VERSION_TAG
+
+          echo "🚀 Pushing tags to ECR..."
+          docker push $REPO_URI:$STABLE_TAG
+          docker push $REPO_URI:$VERSION_TAG
+
+      - name: Setup kubectl
+        uses: azure/setup-kubectl@v4
+        with:
+          version: 'latest'
+
+      - name: Update kubeconfig
+        run: |
+          aws eks update-kubeconfig \
+            --name ${{ secrets.AWS_EKS_CLUSTER_NAME }} \
+            --region ${{ secrets.AWS_ACCOUNT_REGION }}
+
+      - name: Create New Blue Deployment from Green
+        run: |
+          SERVICE_NAME="${{ steps.set-vars.outputs.service_name }}"
+          NAMESPACE="${{ steps.set-vars.outputs.namespace }}"
+          VERSION="${{ steps.set-vars.outputs.version }}"
+
+          # Determine the real service resource name
+          if [ "$SERVICE_NAME" = "frontend" ]; then
+            SERVICE_RESOURCE_NAME="frontend-service"
+          else
+            SERVICE_RESOURCE_NAME="$SERVICE_NAME"
+          fi
+
+          echo "📦 Getting Green Deployment..."
+          kubectl get deployment ${SERVICE_RESOURCE_NAME}-green -n $NAMESPACE -o yaml > green.yaml
+
+          echo "✏️ Updating Green YAML to New Blue Deployment..."
+          sed -i "s/${SERVICE_RESOURCE_NAME}-green/${SERVICE_RESOURCE_NAME}-blue/g" green.yaml
+          sed -i "s/version: green/version: blue/g" green.yaml
+
+          echo "🚀 Applying New Blue Deployment..."
+          kubectl apply -f green.yaml
+
+      - name: Wait for New Blue Deployment to be Ready
+        run: |
+          SERVICE_NAME="${{ steps.set-vars.outputs.service_name }}"
+          NAMESPACE="${{ steps.set-vars.outputs.namespace }}"
+
+          # Determine the real service resource name
+          if [ "$SERVICE_NAME" = "frontend" ]; then
+            SERVICE_RESOURCE_NAME="frontend-service"
+          else
+            SERVICE_RESOURCE_NAME="$SERVICE_NAME"
+          fi
+
+          kubectl rollout status deployment/${SERVICE_RESOURCE_NAME}-blue -n $NAMESPACE --timeout=300s
+
+      - name: Patch Service to Route to Blue
+        run: |
+          SERVICE_NAME="${{ steps.set-vars.outputs.service_name }}"
+          NAMESPACE="${{ steps.set-vars.outputs.namespace }}"
+
+          # Determine the real service resource name
+          if [ "$SERVICE_NAME" = "frontend" ]; then
+            SERVICE_RESOURCE_NAME="frontend-service"
+          else
+            SERVICE_RESOURCE_NAME="$SERVICE_NAME"
+          fi
+
+          echo "🔵 Patching Service ${SERVICE_RESOURCE_NAME} to point to version=blue..."
+
+          kubectl patch service ${SERVICE_RESOURCE_NAME} -n $NAMESPACE -p '{"spec":{"selector":{"app":"'"$SERVICE"'","version":"blue"}}}'
+
+      - name: Verify Service is Routing to Blue
+        run: |
+          SERVICE_NAME="${{ steps.set-vars.outputs.service_name }}"
+          NAMESPACE="${{ steps.set-vars.outputs.namespace }}"
+
+          # Determine the real service resource name
+          if [ "$SERVICE_NAME" = "frontend" ]; then
+            SERVICE_RESOURCE_NAME="frontend-service"
+          else
+            SERVICE_RESOURCE_NAME="$SERVICE_NAME"
+          fi
+
+          kubectl get service ${SERVICE_RESOURCE_NAME} -n $NAMESPACE -o yaml
+
+      - name: Delete Old Green Deployment
+        run: |
+          SERVICE_NAME="${{ steps.set-vars.outputs.service_name }}"
+          NAMESPACE="${{ steps.set-vars.outputs.namespace }}"
+
+          # Determine the real service resource name
+          if [ "$SERVICE_NAME" = "frontend" ]; then
+            SERVICE_RESOURCE_NAME="frontend-service"
+          else
+            SERVICE_RESOURCE_NAME="$SERVICE_NAME"
+          fi
+
+          echo "🗑️ Deleting old Green Deployment: ${SERVICE_RESOURCE_NAME}-green"
+          kubectl delete deployment ${SERVICE_RESOURCE_NAME}-green -n $NAMESPACE || echo "⚠️ Green deployment already deleted."
+
+      - name: Done
+        run: |
+          echo "✅ Successfully promoted Green to new Blue without downtime!"
