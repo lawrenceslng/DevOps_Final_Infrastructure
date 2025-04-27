@@ -77,6 +77,8 @@ jobs:
           # Versions are different → deploy needed
           echo "changed=true" >> $GITHUB_ENV
 
+          echo "Versions do not match, deciding on deployment"
+
           # Decide what kind of deployment to trigger
           if [[ "$NEW_VERSION" == *-rc* ]]; then
             echo "🚀 New RC detected after QA: triggering Deploy to UAT!"
