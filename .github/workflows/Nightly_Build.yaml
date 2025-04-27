@@ -371,6 +371,7 @@ jobs:
       - build-order
       - build-frontend
     if: >
+      always() &&
       (needs.build-cart.result == 'success') ||
       (needs.build-product.result == 'success') ||
       (needs.build-order.result == 'success') ||

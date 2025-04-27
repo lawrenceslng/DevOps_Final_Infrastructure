@@ -19,15 +19,38 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
+      - name: Determine Service Name and VERSION
+        id: set-vars
+        run: |
+          if [ -n "${{ github.event.client_payload.service }}" ]; then
+            SERVICE_NAME="${{ github.event.client_payload.service }}"
+            VERSION="${{ github.event.client_payload.version }}"
+          else
+            SERVICE_NAME="${{ github.event.inputs.service }}"
+            VERSION="${{ github.event.inputs.version }}"
+          fi
+
+          echo "Service: $SERVICE_NAME"
+          echo "Version: $VERSION"
+
+          # Determine Namespace properly
+          NAMESPACE="uat"
+
+          echo "Target namespace: $NAMESPACE"
+
+          echo "service_name=$SERVICE_NAME" >> $GITHUB_OUTPUT
+          echo "namespace=$NAMESPACE" >> $GITHUB_OUTPUT
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+
       - name: Checkout Infrastructure Repository
         uses: actions/checkout@v4
         with:
           path: Infra
 
-      - name: Set ENV variables
-        run: |
-          echo "REPOS=frontend cart-service order-service product-service" >> $GITHUB_ENV
-          echo "ORG=lawrenceslng" >> $GITHUB_ENV
+      # - name: Set ENV variables
+      #   run: |
+      #     echo "REPOS=frontend cart-service order-service product-service" >> $GITHUB_ENV
+      #     echo "ORG=lawrenceslng" >> $GITHUB_ENV
 
       # - name: Check for UAT tags
       #   id: check-tags
@@ -56,19 +79,23 @@ jobs:
 
       - name: Re-tag Nightly Build as RC-1
         run: |
-          # Detect if triggered by repository_dispatch or manual workflow_dispatch
-          if [ -n "${{ github.event.client_payload.service }}" ]; then
-            SERVICE_NAME="${{ github.event.client_payload.service }}"
-            VERSION="${{ github.event.client_payload.version }}"
-          else
-            SERVICE_NAME="${{ github.event.inputs.service }}"
-            VERSION="${{ github.event.inputs.version }}"
-          fi
+          SERVICE_NAME="${{ steps.set-vars.outputs.service_name }}"
+          NAMESPACE="${{ steps.set-vars.outputs.namespace }}"
+          VERSION="${{ steps.set-vars.outputs.version }}"
 
           REPO_URI=${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ secrets.AWS_ACCOUNT_REGION }}.amazonaws.com/$SERVICE_NAME
 
-          echo "⏳ Pulling nightly-latest image for $SERVICE_NAME..."
-          docker pull $REPO_URI:nightly-latest
+          echo "⏳ Attempting to pull nightly-latest image for $SERVICE_NAME"
+          if docker pull $REPO_URI:nightly-latest; then
+            echo "✅ Successfully pulled nightly image"
+          else
+            echo "❌ Failed to pull nightly image image"
+            echo "🚫 Cannot proceed with re-tagging."
+            exit 1
+          fi
+
+          # echo "⏳ Pulling nightly-latest image for $SERVICE_NAME..."
+          # docker pull $REPO_URI:nightly-latest
 
           echo "🏷️ Re-tagging image as $VERSION..."
           docker tag $REPO_URI:nightly-latest $REPO_URI:$VERSION
@@ -169,15 +196,43 @@ jobs:
         run: |
           aws eks update-kubeconfig --region ${{ secrets.AWS_ACCOUNT_REGION }} --name ${{ secrets.AWS_EKS_CLUSTER_NAME }}
 
+      # - name: Prepare Deployment Files
+      #   run: |
+      #     if [ -n "${{ github.event.client_payload.service }}" ]; then
+      #       PROMOTED_SERVICE="${{ github.event.client_payload.service }}"
+      #       PROMOTED_VERSION="${{ github.event.client_payload.version }}"
+      #     else
+      #       PROMOTED_SERVICE="${{ github.event.inputs.service }}"
+      #       PROMOTED_VERSION="${{ github.event.inputs.version }}"
+      #     fi
+
+      #     mkdir processed_k8s
+      #     export AWS_ACCOUNT_ID=${{ secrets.AWS_ACCOUNT_ID }}
+      #     export AWS_REGION=${{ secrets.AWS_ACCOUNT_REGION }}
+      #     export REDIS_URL=${{ secrets.REDIS_URL }}
+      #     export DB_HOST=${{ secrets.DB_HOST }}
+      #     export DB_USER=${{ secrets.DB_USER }}
+      #     export DB_PASSWORD=${{ secrets.DB_PASSWORD }}
+
+      #     for SERVICE in cart-service frontend order-service product-service; do
+      #       echo "Processing $SERVICE..."
+
+      #       cp Infra/k8s/uat/${SERVICE}-deployment.yaml processed_k8s/$SERVICE.yaml
+
+      #       if [ "$SERVICE" == "$PROMOTED_SERVICE" ]; then
+      #         echo "Setting IMAGE_TAG to $PROMOTED_VERSION"
+      #         export IMAGE_TAG="$PROMOTED_VERSION"
+      #       else
+      #         echo "Setting IMAGE_TAG to nightly-latest"
+      #         export IMAGE_TAG="nightly-latest"
+      #       fi
+      #       envsubst < processed_k8s/$SERVICE.yaml > processed_k8s/${SERVICE}-rendered.yaml
+      #     done
+
       - name: Prepare Deployment Files
         run: |
-          if [ -n "${{ github.event.client_payload.service }}" ]; then
-            PROMOTED_SERVICE="${{ github.event.client_payload.service }}"
-            PROMOTED_VERSION="${{ github.event.client_payload.version }}"
-          else
-            PROMOTED_SERVICE="${{ github.event.inputs.service }}"
-            PROMOTED_VERSION="${{ github.event.inputs.version }}"
-          fi
+          SERVICE_NAME="${{ steps.set-vars.outputs.service_name }}"
+          VERSION="${{ steps.set-vars.outputs.version }}"
 
           mkdir processed_k8s
           export AWS_ACCOUNT_ID=${{ secrets.AWS_ACCOUNT_ID }}
@@ -192,9 +247,9 @@ jobs:
 
             cp Infra/k8s/uat/${SERVICE}-deployment.yaml processed_k8s/$SERVICE.yaml
 
-            if [ "$SERVICE" == "$PROMOTED_SERVICE" ]; then
-              echo "Setting IMAGE_TAG to $PROMOTED_VERSION"
-              export IMAGE_TAG="$PROMOTED_VERSION"
+            if [ "$SERVICE" == "$SERVICE_NAME" ]; then
+              echo "Setting IMAGE_TAG to $VERSION"
+              export IMAGE_TAG="$VERSION"
             else
               echo "Setting IMAGE_TAG to nightly-latest"
               export IMAGE_TAG="nightly-latest"
@@ -251,7 +306,7 @@ jobs:
 
       - name: Deploy Deployments
         run: |
-          kubectl apply -f processed_k8s/
+          kubectl apply -f processed_k8s/*-rendered.yaml
     
       # - name: Deploy All Microservices
       #   run: |
