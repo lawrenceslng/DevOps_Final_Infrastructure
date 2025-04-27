@@ -44,6 +44,8 @@ jobs:
 
       - name: Checkout Infra Repo
         uses: actions/checkout@v4
+        with:
+          path: Infra
 
       - name: Configure AWS Credentials
         uses: aws-actions/configure-aws-credentials@v4

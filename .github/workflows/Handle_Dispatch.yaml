@@ -217,6 +217,15 @@ jobs:
             echo "⚠️ No changes to commit in services.json"
           fi
 
+      - name: Configure AWS Credentials
+        if: env.shutdown_uat == 'true'
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-region: ${{ secrets.AWS_ACCOUNT_REGION }}
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-session-token: ${{ secrets.AWS_SESSION_TOKEN }}
+
       - name: Setup kubectl
         if: env.shutdown_uat == 'true'
         uses: azure/setup-kubectl@v4
@@ -231,6 +240,6 @@ jobs:
       - name: Shut Down UAT Namespace
         if: env.shutdown_uat == 'true'
         run: |
-            echo "🧹 Shutting down UAT resources..."
+          echo "🧹 Shutting down UAT resources..."
 
-            kubectl delete namespace uat
+          kubectl delete namespace uat
