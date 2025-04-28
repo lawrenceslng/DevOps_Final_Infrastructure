@@ -4,7 +4,7 @@ sudo dnf update -y
 sudo dnf install mariadb105 -y
 
 # Connect to RDS and create multiple databases
-mysql -h terraform-20250425203328632300000001.c7etq1pbw4s4.us-east-1.rds.amazonaws.com -u root -P 3306 -ppassword <<EOF
+mysql -h <RDS_ENDPOINT> -u <DB_USER> -P 3306 -p<DB_PASSWORD> <<EOF
 CREATE DATABASE IF NOT EXISTS orderdb;
 USE orderdb;
 DROP TABLE IF EXISTS orders;
