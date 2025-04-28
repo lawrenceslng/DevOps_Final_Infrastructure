@@ -7,3 +7,4 @@ labsuser.pem
 tf-outputs.json
 eks-args.env
 .env
+archive

@@ -251,8 +251,8 @@ jobs:
               echo "Setting IMAGE_TAG to $VERSION"
               export IMAGE_TAG="$VERSION"
             else
-              echo "Setting IMAGE_TAG to nightly-latest"
-              export IMAGE_TAG="nightly-latest"
+              echo "Setting IMAGE_TAG to 1.0.0"
+              export IMAGE_TAG="1.0.0"
             fi
 
             envsubst < processed_k8s/$SERVICE.yaml > processed_k8s/${SERVICE}-rendered.yaml
